@@ -64,12 +64,30 @@ export function Landing({ onTry }: LandingProps) {
   return (
     <main className="page">
       <section className="hero">
-        <p className="eyebrow">Zack veille Instagram</p>
+        <p className="eyebrow">Zack · veille Instagram</p>
         <h1>Zack travaille, tu filmes</h1>
         <p>
           De la veille concurrentielle au script seconde par seconde — puis au
           calendrier de tournage.
         </p>
+        <div className="hero-actions">
+          <button type="button" className="cta" onClick={onTry}>
+            Essayer Zack →
+          </button>
+          <span className="hero-note">Apify + Claude branchés</span>
+        </div>
+        <div className="proof">
+          {[
+            { value: '625×', label: 'meilleur score détecté' },
+            { value: '94', label: 'posts analysés / run' },
+            { value: '18s', label: 'script prêt à filmer' },
+          ].map((item) => (
+            <div className="proof-item" key={item.label}>
+              <strong>{item.value}</strong>
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="section">
