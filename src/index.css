@@ -426,18 +426,26 @@ img {
 }
 
 .chat-input {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
+  align-items: stretch;
   gap: 8px;
   margin-top: 8px;
 }
 
 .chat-input input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 12px 16px;
   background: var(--surface);
   outline: none;
+}
+
+.chat-input .cta {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .chat-input input:focus {
