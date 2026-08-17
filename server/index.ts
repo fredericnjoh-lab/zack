@@ -265,7 +265,16 @@ function format(n: number): string {
   return String(Math.round(n))
 }
 
-app.listen(PORT, () => {
-  console.log(`Zack API on http://127.0.0.1:${PORT}`)
+// Serve the built frontend so app + API live on a single stable port.
+const distDir = join(root, 'dist')
+if (existsSync(distDir)) {
+  app.use(express.static(distDir))
+  app.get(/^(?!\/api).*/, (_req, res) => {
+    res.sendFile(join(distDir, 'index.html'))
+  })
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Zack on http://127.0.0.1:${PORT} (app + API)`)
   console.log(`Apify: ${hasApify() ? 'yes' : 'no'} · LLM: ${llmProvider()}`)
 })
