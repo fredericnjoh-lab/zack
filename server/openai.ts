@@ -58,7 +58,7 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown):
 
 async function callClaude(prompt: string): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || ''
-  const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
+  const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5'
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
