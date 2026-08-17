@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { fetchReelsForHandles, hasApify } from './apify.ts'
 import { loadStore, normalizeHandle, saveStore } from './db.ts'
-import { generatePhotoRemake, generateScriptFromReel, hasLLM, llmProvider } from './openai.ts'
+import { analyzeProfile, generatePhotoRemake, generateScriptFromReel, hasLLM, llmProvider } from './openai.ts'
 import { scorePhotos, scoreReels } from './scoring.ts'
 import type { Reel } from './types.ts'
 
@@ -71,11 +71,14 @@ app.delete('/api/accounts/:handle', (req, res) => {
 
 app.get('/api/veille', (_req, res) => {
   const store = loadStore()
-  const scored = scoreReels(store.reels)
+  const liveReels = store.reels.some((r) => r.source === 'apify')
+    ? store.reels.filter((r) => r.source !== 'seed')
+    : store.reels
+  const scored = scoreReels(liveReels)
   res.json({
     accounts: store.accounts,
     hits: scored,
-    allCount: store.reels.length,
+    allCount: liveReels.length,
     lastVeilleAt: store.lastVeilleAt,
     lastVeilleMode: store.lastVeilleMode,
     apify: hasApify(),
@@ -212,7 +215,7 @@ app.post('/api/scripts/generate', async (req, res) => {
   const reel = hits.find((r) => r.id === parsed.data.reelId)
   if (!reel) return res.status(404).json({ error: 'reel introuvable' })
   try {
-    const script = await generateScriptFromReel(reel)
+    const script = await generateScriptFromReel(reel, store.profile)
     store.scripts.unshift(script)
     saveStore(store)
     res.json({ script, openai: hasLLM(), llm: llmProvider() })
@@ -223,7 +226,52 @@ app.post('/api/scripts/generate', async (req, res) => {
 
 app.get('/api/photos', (_req, res) => {
   const store = loadStore()
-  res.json({ hits: scorePhotos(store.reels), remakes: store.remakes.slice(0, 10) })
+  const liveReels = store.reels.some((r) => r.source === 'apify')
+    ? store.reels.filter((r) => r.source !== 'seed')
+    : store.reels
+  res.json({ hits: scorePhotos(liveReels), remakes: store.remakes.slice(0, 10) })
+})
+
+app.get('/api/profile', (_req, res) => {
+  res.json({ profile: loadStore().profile || null })
+})
+
+app.post('/api/profile/analyze', async (req, res) => {
+  const parsed = z.object({ handle: z.string().min(1) }).safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'handle requis' })
+  const handle = normalizeHandle(parsed.data.handle)
+  try {
+    const posts = hasApify()
+      ? await fetchReelsForHandles([handle], 24)
+      : loadStore().reels.filter((r) => r.handle === handle)
+    if (!posts.length) return res.status(404).json({ error: 'aucune publication trouvée' })
+    const profile = await analyzeProfile(handle, posts)
+    const store = loadStore()
+    store.profile = profile
+    saveStore(store)
+    res.json({ profile, llm: llmProvider() })
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : 'analyse profil échouée' })
+  }
+})
+
+app.get('/api/image', async (req, res) => {
+  const raw = typeof req.query.url === 'string' ? req.query.url : ''
+  try {
+    const url = new URL(raw)
+    const allowed = ['cdninstagram.com', 'fbcdn.net'].some(
+      (domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`),
+    )
+    if (url.protocol !== 'https:' || !allowed) return res.status(400).end()
+    const upstream = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } })
+    if (!upstream.ok || !upstream.body) return res.status(502).end()
+    res.setHeader('content-type', upstream.headers.get('content-type') || 'image/jpeg')
+    res.setHeader('cache-control', 'public, max-age=3600')
+    const bytes = Buffer.from(await upstream.arrayBuffer())
+    res.send(bytes)
+  } catch {
+    res.status(400).end()
+  }
 })
 
 app.post('/api/photos/remake', async (req, res) => {
@@ -234,7 +282,7 @@ app.post('/api/photos/remake', async (req, res) => {
   const reel = hits.find((r) => r.id === parsed.data.reelId)
   if (!reel) return res.status(404).json({ error: 'publication introuvable' })
   try {
-    const remake = await generatePhotoRemake(reel)
+    const remake = await generatePhotoRemake(reel, store.profile)
     store.remakes.unshift(remake)
     saveStore(store)
     res.json({ remake, llm: llmProvider() })

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { zackApi } from '../lib/api'
-import type { CalendarItem, GeneratedScript, PhotoRemake, ScoredReel } from '../types'
+import type { CalendarItem, GeneratedScript, PhotoRemake, ProfileAnalysis, ScoredReel } from '../types'
 
-type Tab = 'veille' | 'photos' | 'script' | 'calendrier' | 'chat'
+type Tab = 'profil' | 'veille' | 'photos' | 'script' | 'calendrier' | 'chat'
 type ChatMessage = { from: 'zack' | 'user'; text: string }
 
 type AppShellProps = {
@@ -13,6 +13,12 @@ function formatViews(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${Math.round(n / 1_000)}k`
   return String(Math.round(n))
+}
+
+function imageProxy(source?: string): string | undefined {
+  if (!source) return undefined
+  const params = new URLSearchParams({ url: source })
+  return `/api/image?${params.toString()}`
 }
 
 export function AppShell({ onBack }: AppShellProps) {
@@ -37,6 +43,8 @@ export function AppShell({ onBack }: AppShellProps) {
   const [calendar, setCalendar] = useState<CalendarItem[]>([])
   const [photoHits, setPhotoHits] = useState<ScoredReel[]>([])
   const [remakes, setRemakes] = useState<Record<string, PhotoRemake>>({})
+  const [profile, setProfile] = useState<ProfileAnalysis | null>(null)
+  const [profileHandle, setProfileHandle] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [handleInput, setHandleInput] = useState('')
@@ -44,11 +52,12 @@ export function AppShell({ onBack }: AppShellProps) {
 
   async function refresh() {
     try {
-      const [v, c, s, p] = await Promise.all([
+      const [v, c, s, p, own] = await Promise.all([
         zackApi.veille(),
         zackApi.calendar(),
         zackApi.scripts(),
         zackApi.photos(),
+        zackApi.profile(),
       ])
       setHits(v.hits)
       setAccounts(v.accounts)
@@ -62,6 +71,8 @@ export function AppShell({ onBack }: AppShellProps) {
       setCalendar(c.items)
       if (s.scripts[0]) setScript(s.scripts[0])
       setPhotoHits(p.hits)
+      setProfile(own.profile)
+      if (own.profile) setProfileHandle(own.profile.handle)
       setRemakes((prev) => {
         const next = { ...prev }
         for (const rm of p.remakes) if (!next[rm.sourceReelId]) next[rm.sourceReelId] = rm
@@ -116,9 +127,10 @@ export function AppShell({ onBack }: AppShellProps) {
         </div>
       )}
 
-      <nav className="tabs tabs-5" aria-label="Navigation Zack">
+      <nav className="tabs tabs-6" aria-label="Navigation Zack">
         {(
           [
+            ['profil', 'Mon profil'],
             ['veille', 'Veille'],
             ['photos', 'Photos'],
             ['script', 'Script'],
@@ -136,6 +148,28 @@ export function AppShell({ onBack }: AppShellProps) {
           </button>
         ))}
       </nav>
+
+      {tab === 'profil' && (
+        <ProfilePanel
+          profile={profile}
+          handle={profileHandle}
+          busy={busy}
+          onHandle={setProfileHandle}
+          onAnalyze={async () => {
+            if (!profileHandle.trim()) return
+            setBusy(true)
+            setError('')
+            try {
+              const result = await zackApi.analyzeProfile(profileHandle)
+              setProfile(result.profile)
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'analyse profil échouée')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        />
+      )}
 
       {tab === 'veille' && (
         <VeillePanel
@@ -270,6 +304,97 @@ export function AppShell({ onBack }: AppShellProps) {
   )
 }
 
+function ProfilePanel(props: {
+  profile: ProfileAnalysis | null
+  handle: string
+  busy: boolean
+  onHandle: (value: string) => void
+  onAnalyze: () => void
+}) {
+  return (
+    <section className="panel">
+      <div className="card profile-hero">
+        <div>
+          <span className="eyebrow">Ton ADN de marque</span>
+          <h3>Apprends à Zack comment tu communiques</h3>
+          <p>
+            Zack analyse tes 24 dernières publications, ta voix, tes piliers et les formats qui
+            performent. Tous les prochains scripts et remakes partent de cette base.
+          </p>
+        </div>
+        <div className="chat-input">
+          <input
+            value={props.handle}
+            onChange={(e) => props.onHandle(e.target.value)}
+            placeholder="@ton_compte_instagram"
+            aria-label="Ton profil Instagram"
+          />
+          <button type="button" className="cta" disabled={props.busy} onClick={props.onAnalyze}>
+            {props.busy ? 'Analyse 1–3 min…' : 'Analyser mon profil'}
+          </button>
+        </div>
+      </div>
+
+      {props.profile && (
+        <>
+          <div className="metric-row">
+            <div className="metric">
+              <strong>{props.profile.postsAnalyzed}</strong>
+              <span>publications analysées</span>
+            </div>
+            <div className="metric">
+              <strong>{props.profile.pillars.length}</strong>
+              <span>piliers éditoriaux</span>
+            </div>
+            <div className="metric">
+              <strong>@{props.profile.handle}</strong>
+              <span>profil appris</span>
+            </div>
+          </div>
+
+          <div className="card feature">
+            <h3>Ta voix</h3>
+            <p>{props.profile.voice}</p>
+            <div className="accounts">
+              {props.profile.rules.map((rule) => (
+                <span className="pill" key={rule}>{rule}</span>
+              ))}
+            </div>
+          </div>
+
+          <div className="profile-grid">
+            <div className="card feature">
+              <h3>Piliers</h3>
+              <ul>{props.profile.pillars.map((x) => <li key={x}>{x}</li>)}</ul>
+            </div>
+            <div className="card feature">
+              <h3>Forces</h3>
+              <ul>{props.profile.strengths.map((x) => <li key={x}>{x}</li>)}</ul>
+            </div>
+            <div className="card feature">
+              <h3>Opportunités</h3>
+              <ul>{props.profile.opportunities.map((x) => <li key={x}>{x}</li>)}</ul>
+            </div>
+          </div>
+
+          <div className="profile-gallery">
+            {props.profile.posts.slice(0, 12).map((post) => (
+              <a href={post.url} target="_blank" rel="noreferrer" className="profile-post" key={post.id}>
+                {post.imageUrl ? (
+                  <img src={imageProxy(post.imageUrl)} alt={`Publication @${post.handle}`} loading="lazy" />
+                ) : (
+                  <span>{post.mediaType === 'carousel' ? '❏' : '▶'}</span>
+                )}
+                <small>{formatViews(post.views)} {post.mediaType === 'reel' ? 'vues' : 'likes'}</small>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
 function VeillePanel(props: {
   hits: ScoredReel[]
   accounts: { handle: string }[]
@@ -377,7 +502,12 @@ function VeillePanel(props: {
 
       {props.hits.map((reel) => (
         <article className="reel" key={reel.id}>
-          <div className="thumb">{formatViews(reel.views)}</div>
+          <div className="thumb media-thumb">
+            {reel.imageUrl ? (
+              <img src={imageProxy(reel.imageUrl)} alt={`Miniature @${reel.handle}`} loading="lazy" />
+            ) : null}
+            <span>{formatViews(reel.views)}</span>
+          </div>
           <div>
             <h4>{reel.caption || 'Reel sans caption'}</h4>
             <p>
@@ -438,8 +568,12 @@ function PhotosPanel(props: {
         const variant = remake ? remake[chosen] : null
         return (
           <article className="reel photo" key={post.id}>
-            <div className="thumb photo-thumb">
-              {post.mediaType === 'carousel' ? '❏' : '▢'}
+            <div className="thumb photo-thumb media-thumb">
+              {post.imageUrl ? (
+                <img src={imageProxy(post.imageUrl)} alt={`Publication @${post.handle}`} loading="lazy" />
+              ) : (
+                <b>{post.mediaType === 'carousel' ? '❏' : '▢'}</b>
+              )}
               <span>{formatViews(post.views)}</span>
             </div>
             <div style={{ gridColumn: '2 / -1' }}>

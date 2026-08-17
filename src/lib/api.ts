@@ -1,4 +1,4 @@
-import type { CalendarItem, GeneratedScript, PhotoRemake, ScoredReel, StatusPayload } from '../types'
+import type { CalendarItem, GeneratedScript, PhotoRemake, ProfileAnalysis, ScoredReel, StatusPayload } from '../types'
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -68,6 +68,12 @@ export const zackApi = {
     api<{ remake: PhotoRemake; llm: string }>('/api/photos/remake', {
       method: 'POST',
       body: JSON.stringify({ reelId }),
+    }),
+  profile: () => api<{ profile: ProfileAnalysis | null }>('/api/profile'),
+  analyzeProfile: (handle: string) =>
+    api<{ profile: ProfileAnalysis; llm: string }>('/api/profile/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ handle }),
     }),
   chat: (message: string) => api<{ reply: string }>('/api/chat', {
     method: 'POST',

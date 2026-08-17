@@ -1,4 +1,4 @@
-import type { GeneratedScript, PhotoRemake, ScoredReel } from './types.ts'
+import type { GeneratedScript, PhotoRemake, ProfileAnalysis, Reel, ScoredReel } from './types.ts'
 
 export type LlmProvider = 'claude' | 'openai' | 'local'
 
@@ -17,7 +17,10 @@ export function hasOpenAI(): boolean {
   return hasLLM()
 }
 
-export async function generateScriptFromReel(reel: ScoredReel): Promise<GeneratedScript> {
+export async function generateScriptFromReel(
+  reel: ScoredReel,
+  profile?: ProfileAnalysis,
+): Promise<GeneratedScript> {
   const title = (reel.caption || 'Script Zack').split('\n')[0]!.slice(0, 80)
   const provider = llmProvider()
 
@@ -25,7 +28,7 @@ export async function generateScriptFromReel(reel: ScoredReel): Promise<Generate
     return localScript(reel, title)
   }
 
-  const prompt = buildPrompt(reel)
+  const prompt = buildPrompt(reel, profile)
   const content =
     provider === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
 
@@ -43,18 +46,25 @@ export async function generateScriptFromReel(reel: ScoredReel): Promise<Generate
 }
 
 /** Photos/carrousels : explique pourquoi ça marche, puis refait (identique + dans ta voix). */
-export async function generatePhotoRemake(reel: ScoredReel): Promise<PhotoRemake> {
+export async function generatePhotoRemake(
+  reel: ScoredReel,
+  profile?: ProfileAnalysis,
+): Promise<PhotoRemake> {
   const provider = llmProvider()
   const fallback = localRemake(reel)
   if (provider === 'local') return fallback
 
   const kind = reel.mediaType === 'carousel' ? 'carrousel' : 'photo'
+  const voice = profile
+    ? `\nPROFIL UTILISATEUR @${profile.handle}: ${profile.voice}\nRègles: ${profile.rules.join('; ')}\nPiliers: ${profile.pillars.join('; ')}`
+    : ''
   const prompt = `Tu es Zack, expert contenu Instagram francophone.
 Analyse cette publication ${kind} qui a sur-performé chez un concurrent, puis produis deux remakes.
 Compte: @${reel.handle}
 Type: ${kind}
 Likes: ${reel.views} (score ${reel.score.toFixed(1)}× la médiane ${kind} du compte)
 Légende d'origine: ${reel.caption || '(vide)'}
+${voice}
 
 Réponds UNIQUEMENT en JSON valide (pas de markdown):
 {
@@ -86,6 +96,70 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown):
     }
   } catch {
     return fallback
+  }
+}
+
+export async function analyzeProfile(handle: string, posts: Reel[]): Promise<ProfileAnalysis> {
+  const byType = new Map<string, number[]>()
+  for (const post of posts) {
+    const type = post.mediaType || 'reel'
+    const values = byType.get(type) || []
+    values.push(post.views)
+    byType.set(type, values)
+  }
+  const topFormats = [...byType.entries()].map(([type, values]) => ({
+    type: type as 'reel' | 'photo' | 'carousel',
+    average: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+    count: values.length,
+  }))
+  const fallback: ProfileAnalysis = {
+    handle,
+    analyzedAt: new Date().toISOString(),
+    postsAnalyzed: posts.length,
+    voice: 'Directe, visuelle et centrée sur le produit.',
+    pillars: ['Produit', 'Coulisses', 'Communauté'],
+    strengths: ['Identité cohérente', 'Formats visuels réguliers'],
+    opportunities: ['Hooks plus explicites', 'Davantage de storytelling'],
+    rules: ['Phrases courtes', 'Un angle par publication', 'CTA naturel en fin de légende'],
+    topFormats,
+    posts,
+  }
+  if (!hasLLM()) return fallback
+
+  const samples = posts.slice(0, 20).map((p) => ({
+    type: p.mediaType || 'reel',
+    performance: p.views,
+    caption: (p.caption || '').slice(0, 500),
+  }))
+  const prompt = `Analyse le profil Instagram @${handle} pour que Zack apprenne sa voix.
+Posts: ${JSON.stringify(samples)}
+Réponds uniquement en JSON:
+{"voice":"description précise","pillars":["..."],"strengths":["..."],"opportunities":["..."],"rules":["règles d'écriture concrètes"]}
+3 à 5 éléments par liste.`
+  const content = llmProvider() === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
+  const parsed = parseProfileJson(content)
+  return {
+    ...fallback,
+    voice: parsed.voice || fallback.voice,
+    pillars: parsed.pillars || fallback.pillars,
+    strengths: parsed.strengths || fallback.strengths,
+    opportunities: parsed.opportunities || fallback.opportunities,
+    rules: parsed.rules || fallback.rules,
+  }
+}
+
+function parseProfileJson(content: string): Partial<ProfileAnalysis> {
+  const cleaned = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '')
+  try {
+    return JSON.parse(cleaned) as Partial<ProfileAnalysis>
+  } catch {
+    const match = cleaned.match(/\{[\s\S]*\}/)
+    if (!match) return {}
+    try {
+      return JSON.parse(match[0]) as Partial<ProfileAnalysis>
+    } catch {
+      return {}
+    }
   }
 }
 
@@ -137,11 +211,15 @@ function localRemake(reel: ScoredReel): PhotoRemake {
   }
 }
 
-function buildPrompt(reel: ScoredReel): string {
+function buildPrompt(reel: ScoredReel, profile?: ProfileAnalysis): string {
+  const voice = profile
+    ? `\nPROFIL UTILISATEUR @${profile.handle}: ${profile.voice}\nRègles: ${profile.rules.join('; ')}\nPiliers: ${profile.pillars.join('; ')}`
+    : ''
   return `Tu es Zack, coach Reels Instagram francophone.
 À partir de ce Reel concurrent, écris un script ORIGINAL dans la voix de l'utilisateur (pas une copie).
 Reel @${reel.handle} — ${reel.views} vues — score viral ${reel.score.toFixed(1)}× (baseline ${Math.round(reel.baseline)}).
 Caption: ${reel.caption || '(vide)'}
+${voice}
 
 Réponds UNIQUEMENT en JSON valide (pas de markdown):
 {

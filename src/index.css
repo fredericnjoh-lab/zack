@@ -290,10 +290,6 @@ img {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-}
-
-.tabs.tabs-5 {
-  grid-template-columns: repeat(5, 1fr);
   position: sticky;
   top: 12px;
   z-index: 20;
@@ -305,6 +301,9 @@ img {
   border-radius: 18px;
   box-shadow: var(--shadow);
 }
+
+.tabs.tabs-5 { grid-template-columns: repeat(5, 1fr); }
+.tabs.tabs-6 { grid-template-columns: repeat(6, 1fr); }
 
 .tab {
   padding: 10px 8px;
@@ -374,6 +373,52 @@ img {
   padding: 8px;
   font-size: 11px;
   font-weight: 700;
+}
+
+.media-thumb {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  background: #dbe7ff;
+}
+
+.media-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-thumb > span {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.profile-hero h3 { margin: 0 0 8px; font-family: var(--font-display); }
+.profile-hero p { color: var(--muted); line-height: 1.5; }
+.profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.profile-grid .card { margin: 0; }
+.profile-grid ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.profile-grid li { margin-bottom: 6px; }
+.profile-gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.profile-post {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--blue-soft);
+}
+.profile-post img { width: 100%; height: 100%; object-fit: cover; }
+.profile-post > span { display: grid; place-items: center; height: 100%; color: var(--blue); font-size: 24px; }
+.profile-post small {
+  position: absolute; left: 5px; bottom: 5px; padding: 3px 5px;
+  border-radius: 6px; background: rgba(15, 23, 42, .72); color: #fff; font-size: 9px;
 }
 
 .reel h4 {
@@ -695,6 +740,10 @@ img {
   .tabs.tabs-5 {
     grid-template-columns: repeat(3, 1fr);
   }
+
+  .tabs.tabs-6 { grid-template-columns: repeat(3, 1fr); }
+  .profile-grid { grid-template-columns: 1fr; }
+  .profile-gallery { grid-template-columns: repeat(3, 1fr); }
 
   .reel {
     grid-template-columns: 64px 1fr;

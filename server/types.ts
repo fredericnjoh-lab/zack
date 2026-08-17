@@ -38,6 +38,19 @@ export type PhotoRemake = {
   createdAt: string
 }
 
+export type ProfileAnalysis = {
+  handle: string
+  analyzedAt: string
+  postsAnalyzed: number
+  voice: string
+  pillars: string[]
+  strengths: string[]
+  opportunities: string[]
+  rules: string[]
+  topFormats: { type: MediaType; average: number; count: number }[]
+  posts: Reel[]
+}
+
 export type CalendarItem = {
   id: string
   day: number
@@ -69,6 +82,7 @@ export type Store = {
   calendar: CalendarItem[]
   scripts: GeneratedScript[]
   remakes: PhotoRemake[]
+  profile?: ProfileAnalysis
   lastVeilleAt?: string
   lastVeilleMode?: 'apify' | 'manual' | 'seed'
 }
