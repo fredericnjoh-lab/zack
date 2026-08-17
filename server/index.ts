@@ -244,7 +244,11 @@ app.post('/api/profile/analyze', async (req, res) => {
     const posts = hasApify()
       ? await fetchReelsForHandles([handle], 24)
       : loadStore().reels.filter((r) => r.handle === handle)
-    if (!posts.length) return res.status(404).json({ error: 'aucune publication trouvée' })
+    if (!posts.length) {
+      return res.status(404).json({
+        error: `Aucune publication récupérée pour @${handle}. Vérifie l'orthographe, et que le compte est public (Zack ne peut pas lire un compte privé) et contient des posts.`,
+      })
+    }
     const profile = await analyzeProfile(handle, posts)
     const store = loadStore()
     store.profile = profile

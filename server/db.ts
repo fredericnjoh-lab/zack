@@ -177,6 +177,20 @@ export function saveStore(store: Store) {
   writeFileSync(storePath, JSON.stringify(store, null, 2))
 }
 
+/** Accepts "@nom", "nom", or a full instagram.com profile URL. */
 export function normalizeHandle(raw: string): string {
-  return raw.trim().replace(/^@/, '').replace(/\/$/, '').toLowerCase()
+  let value = raw.trim()
+  if (/instagram\.com/i.test(value)) {
+    try {
+      const url = new URL(value.startsWith('http') ? value : `https://${value}`)
+      value = url.pathname.split('/').filter(Boolean)[0] || ''
+    } catch {
+      value = value.split('instagram.com/')[1] || value
+    }
+  }
+  return value
+    .split(/[/?#]/)[0]!
+    .replace(/^@/, '')
+    .trim()
+    .toLowerCase()
 }
