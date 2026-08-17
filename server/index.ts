@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { fetchReelsForHandles, hasApify } from './apify.ts'
 import { loadStore, normalizeHandle, saveStore } from './db.ts'
-import { generateScriptFromReel, hasOpenAI } from './openai.ts'
+import { generateScriptFromReel, hasLLM, llmProvider } from './openai.ts'
 import { scoreReels } from './scoring.ts'
 import type { Reel } from './types.ts'
 
@@ -31,7 +31,9 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     apify: hasApify(),
-    openai: hasOpenAI(),
+    llm: llmProvider(),
+    openai: hasLLM(),
+    claude: llmProvider() === 'claude',
     accounts: store.accounts.length,
     reels: store.reels.length,
     lastVeilleAt: store.lastVeilleAt,
@@ -77,7 +79,9 @@ app.get('/api/veille', (_req, res) => {
     lastVeilleAt: store.lastVeilleAt,
     lastVeilleMode: store.lastVeilleMode,
     apify: hasApify(),
-    openai: hasOpenAI(),
+    openai: hasLLM(),
+    llm: llmProvider(),
+    claude: llmProvider() === 'claude',
   })
 })
 
@@ -211,7 +215,7 @@ app.post('/api/scripts/generate', async (req, res) => {
     const script = await generateScriptFromReel(reel)
     store.scripts.unshift(script)
     saveStore(store)
-    res.json({ script, openai: hasOpenAI() })
+    res.json({ script, openai: hasLLM(), llm: llmProvider() })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'script failed' })
   }
@@ -223,6 +227,7 @@ app.post('/api/chat', async (req, res) => {
   const text = parsed.data.message.toLowerCase()
   const store = loadStore()
   const hits = scoreReels(store.reels)
+  const llm = llmProvider()
 
   if (text.includes('veille') || text.includes('lance')) {
     return res.json({
@@ -241,13 +246,16 @@ app.post('/api/chat', async (req, res) => {
   }
   if (text.includes('accroche') || text.includes('script')) {
     return res.json({
-      reply: hasOpenAI()
-        ? 'OK — choisis un Reel dans Veille puis « Générer le script » (OpenAI branché).'
-        : 'Scripts locaux dispo sans clé. Pour une voix plus riche, ajoute OPENAI_API_KEY.',
+      reply:
+        llm === 'claude'
+          ? 'OK — choisis un Reel dans Veille puis « Générer le script » (Claude branché).'
+          : llm === 'openai'
+            ? 'OK — choisis un Reel dans Veille puis « Générer le script » (OpenAI branché).'
+            : 'Scripts locaux dispo sans clé. Pour Claude, ajoute ANTHROPIC_API_KEY.',
     })
   }
   res.json({
-    reply: `Compte : ${store.accounts.length} suivis · ${hits.length} hits viraux · Apify ${hasApify() ? 'ON' : 'OFF'} · OpenAI ${hasOpenAI() ? 'ON' : 'OFF'}. Dis « lance une veille », « montre-moi les meilleurs », ou « script ».`,
+    reply: `Compte : ${store.accounts.length} suivis · ${hits.length} hits viraux · Apify ${hasApify() ? 'ON' : 'OFF'} · LLM ${llm}. Dis « lance une veille », « montre-moi les meilleurs », ou « script ».`,
   })
 })
 
@@ -259,5 +267,5 @@ function format(n: number): string {
 
 app.listen(PORT, () => {
   console.log(`Zack API on http://127.0.0.1:${PORT}`)
-  console.log(`Apify: ${hasApify() ? 'yes' : 'no'} · OpenAI: ${hasOpenAI() ? 'yes' : 'no'}`)
+  console.log(`Apify: ${hasApify() ? 'yes' : 'no'} · LLM: ${llmProvider()}`)
 })

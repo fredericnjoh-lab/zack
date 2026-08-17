@@ -1,21 +1,23 @@
+# Dependencies
+node_modules/
 
 # Build
+dist/
+dist-ssr/
+*.local
+
+# Local Zack data + secrets
 data/
-# Dependencies
-dist
-dist-ssr
-.DS_Store
-# Editor
 .env
 .env.*
-# Env
 !.env.example
-.idea
-*.local
-# Local Zack data
-*.log
+
 # Logs / OS
-node_modules
+.DS_Store
+*.log
 npm-debug.log*
+
+# Editor
 .vscode/*
 !.vscode/extensions.json
+.idea

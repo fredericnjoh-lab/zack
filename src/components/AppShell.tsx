@@ -26,7 +26,13 @@ export function AppShell({ onBack }: AppShellProps) {
   const [draft, setDraft] = useState('')
   const [hits, setHits] = useState<ScoredReel[]>([])
   const [accounts, setAccounts] = useState<{ handle: string }[]>([])
-  const [status, setStatus] = useState({ apify: false, openai: false, mode: '', notice: '' })
+  const [status, setStatus] = useState({
+    apify: false,
+    openai: false,
+    llm: 'local' as string,
+    mode: '',
+    notice: '',
+  })
   const [script, setScript] = useState<GeneratedScript | null>(null)
   const [calendar, setCalendar] = useState<CalendarItem[]>([])
   const [busy, setBusy] = useState(false)
@@ -42,6 +48,7 @@ export function AppShell({ onBack }: AppShellProps) {
       setStatus({
         apify: v.apify,
         openai: v.openai,
+        llm: v.llm || (v.claude ? 'claude' : v.openai ? 'openai' : 'local'),
         mode: v.lastVeilleMode || '',
         notice: '',
       })
@@ -81,7 +88,7 @@ export function AppShell({ onBack }: AppShellProps) {
           <p>
             {accounts.length} comptes · {hits.length} exceptions
             {status.apify ? ' · Apify ON' : ' · mode local'}
-            {status.openai ? ' · OpenAI ON' : ''}
+            {status.openai ? (status.llm === 'claude' ? ' · Claude ON' : ' · LLM ON') : ''}
           </p>
         </div>
         <button type="button" className="cta ghost" onClick={onBack}>

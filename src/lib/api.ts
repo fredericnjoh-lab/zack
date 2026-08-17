@@ -23,6 +23,8 @@ export const zackApi = {
       lastVeilleMode?: string
       apify: boolean
       openai: boolean
+      llm?: string
+      claude?: boolean
     }>('/api/veille'),
   runVeille: () =>
     api<{ mode: string; hits: ScoredReel[]; notice?: string; fetched: number }>('/api/veille/run', {

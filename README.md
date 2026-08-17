@@ -26,7 +26,10 @@ npm run dev
 2. Mets `APIFY_TOKEN=...` dans `.env`
 3. Relance `npm run dev` → **Lancer la veille Apify**
 
-Optionnel : `OPENAI_API_KEY` pour des scripts plus riches (sinon script local).
+Optionnel scripts LLM (dans l’ordre) :
+1. `ANTHROPIC_API_KEY` → **Claude** (recommandé)
+2. sinon `OPENAI_API_KEY`
+3. sinon script local sans clé
 
 ## Limites honnêtes
 
