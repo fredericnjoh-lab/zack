@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { fetchReelsForHandles, hasApify } from './apify.ts'
 import { loadStore, normalizeHandle, saveStore } from './db.ts'
-import { generateScriptFromReel, hasLLM, llmProvider } from './openai.ts'
-import { scoreReels } from './scoring.ts'
+import { generatePhotoRemake, generateScriptFromReel, hasLLM, llmProvider } from './openai.ts'
+import { scorePhotos, scoreReels } from './scoring.ts'
 import type { Reel } from './types.ts'
 
 // Load .env without extra dependency
@@ -218,6 +218,28 @@ app.post('/api/scripts/generate', async (req, res) => {
     res.json({ script, openai: hasLLM(), llm: llmProvider() })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'script failed' })
+  }
+})
+
+app.get('/api/photos', (_req, res) => {
+  const store = loadStore()
+  res.json({ hits: scorePhotos(store.reels), remakes: store.remakes.slice(0, 10) })
+})
+
+app.post('/api/photos/remake', async (req, res) => {
+  const parsed = z.object({ reelId: z.string().min(1) }).safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'reelId requis' })
+  const store = loadStore()
+  const hits = scorePhotos(store.reels, 0)
+  const reel = hits.find((r) => r.id === parsed.data.reelId)
+  if (!reel) return res.status(404).json({ error: 'publication introuvable' })
+  try {
+    const remake = await generatePhotoRemake(reel)
+    store.remakes.unshift(remake)
+    saveStore(store)
+    res.json({ remake, llm: llmProvider() })
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : 'remake failed' })
   }
 })
 

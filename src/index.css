@@ -290,6 +290,10 @@ img {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+}
+
+.tabs.tabs-5 {
+  grid-template-columns: repeat(5, 1fr);
   position: sticky;
   top: 12px;
   z-index: 20;
@@ -546,6 +550,101 @@ img {
   font-size: 0.9rem;
 }
 
+.photo-thumb {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  font-size: 22px;
+}
+
+.photo-thumb span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.remake {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.remake-why {
+  background: var(--blue-wash);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.remake-why strong {
+  color: var(--blue);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.remake-why p {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.seg {
+  display: inline-flex;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.seg-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.seg-btn.active {
+  background: var(--blue);
+  color: #fff;
+}
+
+.remake-body label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 10px 0 4px;
+}
+
+.remake-caption {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.remake-body ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.remake-body li {
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.remake-tags {
+  margin: 10px 0 0;
+  color: var(--blue);
+  font-size: 0.88rem;
+}
+
 .accounts {
   display: flex;
   flex-wrap: wrap;
@@ -591,6 +690,10 @@ img {
 
   .tabs {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tabs.tabs-5 {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .reel {

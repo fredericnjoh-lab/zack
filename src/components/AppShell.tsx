@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { zackApi } from '../lib/api'
-import type { CalendarItem, GeneratedScript, ScoredReel } from '../types'
+import type { CalendarItem, GeneratedScript, PhotoRemake, ScoredReel } from '../types'
 
-type Tab = 'veille' | 'script' | 'calendrier' | 'chat'
+type Tab = 'veille' | 'photos' | 'script' | 'calendrier' | 'chat'
 type ChatMessage = { from: 'zack' | 'user'; text: string }
 
 type AppShellProps = {
@@ -35,6 +35,8 @@ export function AppShell({ onBack }: AppShellProps) {
   })
   const [script, setScript] = useState<GeneratedScript | null>(null)
   const [calendar, setCalendar] = useState<CalendarItem[]>([])
+  const [photoHits, setPhotoHits] = useState<ScoredReel[]>([])
+  const [remakes, setRemakes] = useState<Record<string, PhotoRemake>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [handleInput, setHandleInput] = useState('')
@@ -42,7 +44,12 @@ export function AppShell({ onBack }: AppShellProps) {
 
   async function refresh() {
     try {
-      const [v, c, s] = await Promise.all([zackApi.veille(), zackApi.calendar(), zackApi.scripts()])
+      const [v, c, s, p] = await Promise.all([
+        zackApi.veille(),
+        zackApi.calendar(),
+        zackApi.scripts(),
+        zackApi.photos(),
+      ])
       setHits(v.hits)
       setAccounts(v.accounts)
       setStatus({
@@ -54,6 +61,12 @@ export function AppShell({ onBack }: AppShellProps) {
       })
       setCalendar(c.items)
       if (s.scripts[0]) setScript(s.scripts[0])
+      setPhotoHits(p.hits)
+      setRemakes((prev) => {
+        const next = { ...prev }
+        for (const rm of p.remakes) if (!next[rm.sourceReelId]) next[rm.sourceReelId] = rm
+        return next
+      })
       setError('')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'API indisponible — lance npm run dev')
@@ -103,10 +116,11 @@ export function AppShell({ onBack }: AppShellProps) {
         </div>
       )}
 
-      <nav className="tabs" aria-label="Navigation Zack">
+      <nav className="tabs tabs-5" aria-label="Navigation Zack">
         {(
           [
             ['veille', 'Veille'],
+            ['photos', 'Photos'],
             ['script', 'Script'],
             ['calendrier', 'Agenda'],
             ['chat', 'Parler'],
@@ -192,6 +206,25 @@ export function AppShell({ onBack }: AppShellProps) {
               setTab('script')
             } catch (e) {
               setError(e instanceof Error ? e.message : 'script failed')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        />
+      )}
+
+      {tab === 'photos' && (
+        <PhotosPanel
+          hits={photoHits}
+          remakes={remakes}
+          busy={busy}
+          onRemake={async (reelId) => {
+            setBusy(true)
+            try {
+              const r = await zackApi.remakePhoto(reelId)
+              setRemakes((prev) => ({ ...prev, [reelId]: r.remake }))
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'remake failed')
             } finally {
               setBusy(false)
             }
@@ -367,6 +400,122 @@ function VeillePanel(props: {
           </div>
         </article>
       ))}
+    </section>
+  )
+}
+
+function PhotosPanel(props: {
+  hits: ScoredReel[]
+  remakes: Record<string, PhotoRemake>
+  busy: boolean
+  onRemake: (reelId: string) => void
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [mode, setMode] = useState<Record<string, 'identical' | 'inVoice'>>({})
+
+  return (
+    <section className="panel">
+      <div className="card">
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Photos & carrousels</h3>
+        <p style={{ color: 'var(--muted)', margin: 0 }}>
+          Pas que les Reels. Zack sort le meilleur des publications photo, t’explique pourquoi ça a
+          marché, puis le refait : à l’identique ou réécrit dans ta voix. C’est toi qui choisis.
+        </p>
+      </div>
+
+      {props.hits.length === 0 && (
+        <div className="card">
+          <p style={{ color: 'var(--muted)', margin: 0 }}>
+            Aucune photo/carrousel exceptionnel pour l’instant. Lance une veille Apify — Zack classe
+            automatiquement Reels vs photos et les score séparément.
+          </p>
+        </div>
+      )}
+
+      {props.hits.map((post) => {
+        const remake = props.remakes[post.id]
+        const chosen = mode[post.id] || 'identical'
+        const variant = remake ? remake[chosen] : null
+        return (
+          <article className="reel photo" key={post.id}>
+            <div className="thumb photo-thumb">
+              {post.mediaType === 'carousel' ? '❏' : '▢'}
+              <span>{formatViews(post.views)}</span>
+            </div>
+            <div style={{ gridColumn: '2 / -1' }}>
+              <h4>{post.caption || 'Publication sans légende'}</h4>
+              <p>
+                @{post.handle} · {post.mediaType === 'carousel' ? 'carrousel' : 'photo'} · baseline{' '}
+                {formatViews(post.baseline)} likes
+              </p>
+              <p>
+                <strong style={{ color: 'var(--blue)' }}>{post.score.toFixed(1)}×</strong> {post.why}
+              </p>
+
+              {!remake && (
+                <button
+                  type="button"
+                  className="cta"
+                  style={{ marginTop: 8 }}
+                  disabled={props.busy}
+                  onClick={() => {
+                    setOpenId(post.id)
+                    props.onRemake(post.id)
+                  }}
+                >
+                  {props.busy && openId === post.id ? 'Zack analyse…' : 'Refaire cette publication'}
+                </button>
+              )}
+
+              {remake && (
+                <div className="remake">
+                  <div className="remake-why">
+                    <strong>Pourquoi ça marche</strong>
+                    <p>{remake.why}</p>
+                  </div>
+
+                  <div className="seg">
+                    <button
+                      type="button"
+                      className={`seg-btn${chosen === 'identical' ? ' active' : ''}`}
+                      onClick={() => setMode((m) => ({ ...m, [post.id]: 'identical' }))}
+                    >
+                      À l’identique
+                    </button>
+                    <button
+                      type="button"
+                      className={`seg-btn${chosen === 'inVoice' ? ' active' : ''}`}
+                      onClick={() => setMode((m) => ({ ...m, [post.id]: 'inVoice' }))}
+                    >
+                      Dans ma voix
+                    </button>
+                  </div>
+
+                  {variant && (
+                    <div className="remake-body">
+                      <label>Légende</label>
+                      <p className="remake-caption">{variant.caption}</p>
+                      {variant.shotList?.length > 0 && (
+                        <>
+                          <label>Plan de tournage</label>
+                          <ul>
+                            {variant.shotList.map((s, i) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                      {variant.hashtags?.length > 0 && (
+                        <p className="remake-tags">{variant.hashtags.join(' ')}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </article>
+        )
+      })}
     </section>
   )
 }

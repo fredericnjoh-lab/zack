@@ -107,8 +107,58 @@ const seed: Store = {
     { id: 'c4', day: 22, month: 8, year: 2026, label: 'Veille du lundi', status: 'publie' },
   ],
   scripts: [],
+  remakes: [],
   lastVeilleMode: 'seed',
 }
+
+// A few seed photo/carousel posts so the Photos tab is usable without Apify.
+seed.reels.push(
+  {
+    id: 'seed-p1',
+    handle: 'capucinemode',
+    caption: 'Carrousel : 5 pièces intemporelles de l’automne',
+    views: 48_000,
+    likes: 48_000,
+    source: 'seed',
+    mediaType: 'carousel',
+  },
+  {
+    id: 'seed-p2',
+    handle: 'capucinemode',
+    caption: 'Photo lookbook studio',
+    views: 9_000,
+    likes: 9_000,
+    source: 'seed',
+    mediaType: 'photo',
+  },
+  {
+    id: 'seed-p3',
+    handle: 'capucinemode',
+    caption: 'Photo miroir du matin',
+    views: 7_500,
+    likes: 7_500,
+    source: 'seed',
+    mediaType: 'photo',
+  },
+  {
+    id: 'seed-p4',
+    handle: 'studio.nord',
+    caption: 'Carrousel : avant / après réaménagement',
+    views: 62_000,
+    likes: 62_000,
+    source: 'seed',
+    mediaType: 'carousel',
+  },
+  {
+    id: 'seed-p5',
+    handle: 'studio.nord',
+    caption: 'Photo produit sur fond neutre',
+    views: 8_800,
+    likes: 8_800,
+    source: 'seed',
+    mediaType: 'photo',
+  },
+)
 
 function ensure() {
   if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
@@ -117,7 +167,9 @@ function ensure() {
 
 export function loadStore(): Store {
   ensure()
-  return JSON.parse(readFileSync(storePath, 'utf8')) as Store
+  const store = JSON.parse(readFileSync(storePath, 'utf8')) as Store
+  if (!store.remakes) store.remakes = []
+  return store
 }
 
 export function saveStore(store: Store) {

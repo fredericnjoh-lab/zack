@@ -3,6 +3,8 @@ export type Account = {
   addedAt: string
 }
 
+export type MediaType = 'reel' | 'photo' | 'carousel'
+
 export type Reel = {
   id: string
   handle: string
@@ -14,12 +16,26 @@ export type Reel = {
   comments?: number
   takenAt?: string
   source: 'apify' | 'manual' | 'seed'
+  mediaType?: MediaType
+  imageUrl?: string
 }
 
 export type ScoredReel = Reel & {
   baseline: number
   score: number
   why: string
+  /** Which engagement signal was used as the baseline metric. */
+  metric: 'vues' | 'likes'
+}
+
+export type PhotoRemake = {
+  id: string
+  sourceReelId: string
+  handle: string
+  why: string
+  identical: { caption: string; hashtags: string[]; shotList: string[] }
+  inVoice: { caption: string; hashtags: string[]; shotList: string[] }
+  createdAt: string
 }
 
 export type CalendarItem = {
@@ -52,6 +68,7 @@ export type Store = {
   reels: Reel[]
   calendar: CalendarItem[]
   scripts: GeneratedScript[]
+  remakes: PhotoRemake[]
   lastVeilleAt?: string
   lastVeilleMode?: 'apify' | 'manual' | 'seed'
 }

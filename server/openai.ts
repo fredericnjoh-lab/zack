@@ -1,4 +1,4 @@
-import type { GeneratedScript, ScoredReel } from './types.ts'
+import type { GeneratedScript, PhotoRemake, ScoredReel } from './types.ts'
 
 export type LlmProvider = 'claude' | 'openai' | 'local'
 
@@ -38,6 +38,101 @@ export async function generateScriptFromReel(reel: ScoredReel): Promise<Generate
     sourceReelId: reel.id,
     beats: parsed.beats?.length ? parsed.beats : fallback.beats,
     captions: parsed.captions || fallback.captions,
+    createdAt: new Date().toISOString(),
+  }
+}
+
+/** Photos/carrousels : explique pourquoi ça marche, puis refait (identique + dans ta voix). */
+export async function generatePhotoRemake(reel: ScoredReel): Promise<PhotoRemake> {
+  const provider = llmProvider()
+  const fallback = localRemake(reel)
+  if (provider === 'local') return fallback
+
+  const kind = reel.mediaType === 'carousel' ? 'carrousel' : 'photo'
+  const prompt = `Tu es Zack, expert contenu Instagram francophone.
+Analyse cette publication ${kind} qui a sur-performé chez un concurrent, puis produis deux remakes.
+Compte: @${reel.handle}
+Type: ${kind}
+Likes: ${reel.views} (score ${reel.score.toFixed(1)}× la médiane ${kind} du compte)
+Légende d'origine: ${reel.caption || '(vide)'}
+
+Réponds UNIQUEMENT en JSON valide (pas de markdown):
+{
+  "why": "2-3 phrases: pourquoi CETTE publication a marché (angle, hook visuel, émotion, structure du carrousel).",
+  "identical": {
+    "caption": "reprise fidèle de l'angle, adaptée FR, prête à publier",
+    "hashtags": ["#..."],
+    "shotList": ["plan/slide 1: ...", "plan/slide 2: ..."]
+  },
+  "inVoice": {
+    "caption": "même concept mais réécrit dans une voix perso, plus authentique",
+    "hashtags": ["#..."],
+    "shotList": ["plan/slide 1: ...", "plan/slide 2: ..."]
+  }
+}
+3 à 5 éléments de shotList par version.`
+
+  try {
+    const content = provider === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
+    const parsed = parseRemakeJson(content)
+    return {
+      id: `remake-${Date.now()}`,
+      sourceReelId: reel.id,
+      handle: reel.handle,
+      why: parsed.why || fallback.why,
+      identical: parsed.identical || fallback.identical,
+      inVoice: parsed.inVoice || fallback.inVoice,
+      createdAt: new Date().toISOString(),
+    }
+  } catch {
+    return fallback
+  }
+}
+
+function parseRemakeJson(content: string): Partial<Omit<PhotoRemake, 'id' | 'sourceReelId' | 'handle' | 'createdAt'>> {
+  const cleaned = content
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+  const tryParse = (s: string) => {
+    try {
+      return JSON.parse(s) as Record<string, unknown>
+    } catch {
+      return null
+    }
+  }
+  const obj = tryParse(cleaned) || tryParse(cleaned.match(/\{[\s\S]*\}/)?.[0] || '')
+  if (!obj) return {}
+  return obj as Partial<Omit<PhotoRemake, 'id' | 'sourceReelId' | 'handle' | 'createdAt'>>
+}
+
+function localRemake(reel: ScoredReel): PhotoRemake {
+  const kind = reel.mediaType === 'carousel' ? 'carrousel' : 'photo'
+  const base = (reel.caption || '').slice(0, 120)
+  return {
+    id: `remake-${Date.now()}`,
+    sourceReelId: reel.id,
+    handle: reel.handle,
+    why: `Cette ${kind} fait ${reel.score.toFixed(1)}× les likes habituels de @${reel.handle} : angle fort + visuel qui arrête le scroll. On garde la structure, pas les mots.`,
+    identical: {
+      caption: base ? `Repris de l'angle qui a marché : ${base}` : `Même angle que la ${kind} qui a cartonné.`,
+      hashtags: ['#inspo', '#contenu', '#instagram'],
+      shotList: [
+        `Slide 1 : le hook visuel identique (${kind})`,
+        'Slide 2 : la preuve / le détail',
+        'Slide 3 : le CTA',
+      ],
+    },
+    inVoice: {
+      caption: 'Même idée, mais racontée à ma façon — plus perso, plus vrai.',
+      hashtags: ['#mavoix', '#behindthescenes'],
+      shotList: [
+        'Slide 1 : mon hook perso',
+        'Slide 2 : mon expérience/preuve',
+        'Slide 3 : mon CTA',
+      ],
+    },
     createdAt: new Date().toISOString(),
   }
 }

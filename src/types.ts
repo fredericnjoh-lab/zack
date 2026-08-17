@@ -1,3 +1,5 @@
+export type MediaType = 'reel' | 'photo' | 'carousel'
+
 export type ScoredReel = {
   id: string
   handle: string
@@ -9,9 +11,22 @@ export type ScoredReel = {
   comments?: number
   takenAt?: string
   source: 'apify' | 'manual' | 'seed'
+  mediaType?: MediaType
+  imageUrl?: string
   baseline: number
   score: number
   why: string
+  metric: 'vues' | 'likes'
+}
+
+export type PhotoRemake = {
+  id: string
+  sourceReelId: string
+  handle: string
+  why: string
+  identical: { caption: string; hashtags: string[]; shotList: string[] }
+  inVoice: { caption: string; hashtags: string[]; shotList: string[] }
+  createdAt: string
 }
 
 export type CalendarItem = {
