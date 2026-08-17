@@ -6,6 +6,9 @@ dist
 dist-ssr
 *.local
 
+# Local Zack data
+data/
+
 # Logs / OS
 .DS_Store
 *.log
@@ -15,3 +18,8 @@ npm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# Env
+.env
+.env.*
+!.env.example

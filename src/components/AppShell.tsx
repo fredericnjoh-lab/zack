@@ -1,11 +1,6 @@
-import { useState } from 'react'
-import {
-  calendarItems,
-  chatStarter,
-  reelHits,
-  scriptBeats,
-  watchedAccounts,
-} from '../data/demo'
+import { useEffect, useState } from 'react'
+import { zackApi } from '../lib/api'
+import type { CalendarItem, GeneratedScript, ScoredReel } from '../types'
 
 type Tab = 'veille' | 'script' | 'calendrier' | 'chat'
 type ChatMessage = { from: 'zack' | 'user'; text: string }
@@ -14,17 +9,68 @@ type AppShellProps = {
   onBack: () => void
 }
 
+function formatViews(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`
+  return String(Math.round(n))
+}
+
 export function AppShell({ onBack }: AppShellProps) {
   const [tab, setTab] = useState<Tab>('veille')
-  const [messages, setMessages] = useState<ChatMessage[]>(chatStarter)
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      from: 'zack',
+      text: 'Salut — ajoute tes concurrents, lance une veille, ou colle un Reel à la main. Qu’est-ce qu’on fait ?',
+    },
+  ])
   const [draft, setDraft] = useState('')
+  const [hits, setHits] = useState<ScoredReel[]>([])
+  const [accounts, setAccounts] = useState<{ handle: string }[]>([])
+  const [status, setStatus] = useState({ apify: false, openai: false, mode: '', notice: '' })
+  const [script, setScript] = useState<GeneratedScript | null>(null)
+  const [calendar, setCalendar] = useState<CalendarItem[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [handleInput, setHandleInput] = useState('')
+  const [manual, setManual] = useState({ handle: '', views: '', caption: '', baseline: '' })
 
-  function send() {
+  async function refresh() {
+    try {
+      const [v, c, s] = await Promise.all([zackApi.veille(), zackApi.calendar(), zackApi.scripts()])
+      setHits(v.hits)
+      setAccounts(v.accounts)
+      setStatus({
+        apify: v.apify,
+        openai: v.openai,
+        mode: v.lastVeilleMode || '',
+        notice: '',
+      })
+      setCalendar(c.items)
+      if (s.scripts[0]) setScript(s.scripts[0])
+      setError('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'API indisponible — lance npm run dev')
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  async function send() {
     const text = draft.trim()
     if (!text) return
-    const reply = replyTo(text)
-    setMessages((prev) => [...prev, { from: 'user', text }, { from: 'zack', text: reply }])
     setDraft('')
+    setMessages((prev) => [...prev, { from: 'user', text }])
+    try {
+      const { reply } = await zackApi.chat(text)
+      setMessages((prev) => [...prev, { from: 'zack', text: reply }])
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { from: 'zack', text: 'API offline. Relance `npm run dev` dans le dossier zack.' },
+      ])
+    }
   }
 
   return (
@@ -32,12 +78,23 @@ export function AppShell({ onBack }: AppShellProps) {
       <div className="shell-top">
         <div>
           <h1>Zack</h1>
-          <p>Palmarès du jour · 6 comptes surveillés</p>
+          <p>
+            {accounts.length} comptes · {hits.length} exceptions
+            {status.apify ? ' · Apify ON' : ' · mode local'}
+            {status.openai ? ' · OpenAI ON' : ''}
+          </p>
         </div>
         <button type="button" className="cta ghost" onClick={onBack}>
           ← Accueil
         </button>
       </div>
+
+      {error && (
+        <div className="card" style={{ borderColor: '#fca5a5', marginBottom: 12 }}>
+          <strong>API</strong>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>{error}</p>
+        </div>
+      )}
 
       <nav className="tabs" aria-label="Navigation Zack">
         {(
@@ -59,9 +116,93 @@ export function AppShell({ onBack }: AppShellProps) {
         ))}
       </nav>
 
-      {tab === 'veille' && <VeillePanel />}
-      {tab === 'script' && <ScriptPanel />}
-      {tab === 'calendrier' && <CalendarPanel />}
+      {tab === 'veille' && (
+        <VeillePanel
+          hits={hits}
+          accounts={accounts}
+          busy={busy}
+          handleInput={handleInput}
+          manual={manual}
+          notice={status.notice}
+          apify={status.apify}
+          onHandleInput={setHandleInput}
+          onManual={setManual}
+          onAddAccount={async () => {
+            if (!handleInput.trim()) return
+            setBusy(true)
+            try {
+              await zackApi.addAccount(handleInput)
+              setHandleInput('')
+              await refresh()
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'erreur')
+            } finally {
+              setBusy(false)
+            }
+          }}
+          onRemoveAccount={async (handle) => {
+            await zackApi.removeAccount(handle)
+            await refresh()
+          }}
+          onRun={async () => {
+            setBusy(true)
+            try {
+              const r = await zackApi.runVeille()
+              setHits(r.hits)
+              setStatus((s) => ({ ...s, mode: r.mode, notice: r.notice || '' }))
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'veille failed')
+            } finally {
+              setBusy(false)
+            }
+          }}
+          onManualAdd={async () => {
+            const views = Number(manual.views)
+            const baseline = manual.baseline ? Number(manual.baseline) : undefined
+            if (!manual.handle || !views) return
+            setBusy(true)
+            try {
+              const r = await zackApi.addManualReel({
+                handle: manual.handle,
+                views,
+                caption: manual.caption || undefined,
+                baseline,
+              })
+              setHits(r.hits)
+              setManual({ handle: '', views: '', caption: '', baseline: '' })
+              await refresh()
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'erreur')
+            } finally {
+              setBusy(false)
+            }
+          }}
+          onScript={async (reelId) => {
+            setBusy(true)
+            try {
+              const r = await zackApi.generateScript(reelId)
+              setScript(r.script)
+              setTab('script')
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'script failed')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        />
+      )}
+
+      {tab === 'script' && <ScriptPanel script={script} />}
+      {tab === 'calendrier' && (
+        <CalendarPanel
+          items={calendar}
+          onAdd={async (day, label) => {
+            await zackApi.addCalendar({ day, label, status: 'ecrit' })
+            const c = await zackApi.calendar()
+            setCalendar(c.items)
+          }}
+        />
+      )}
       {tab === 'chat' && (
         <section className="panel chat">
           {messages.map((m, i) => (
@@ -75,11 +216,11 @@ export function AppShell({ onBack }: AppShellProps) {
               onChange={(e) => setDraft(e.target.value)}
               placeholder="lance une veille…"
               onKeyDown={(e) => {
-                if (e.key === 'Enter') send()
+                if (e.key === 'Enter') void send()
               }}
               aria-label="Message à Zack"
             />
-            <button type="button" className="cta" onClick={send}>
+            <button type="button" className="cta" onClick={() => void send()}>
               Envoyer
             </button>
           </div>
@@ -89,44 +230,129 @@ export function AppShell({ onBack }: AppShellProps) {
   )
 }
 
-function VeillePanel() {
+function VeillePanel(props: {
+  hits: ScoredReel[]
+  accounts: { handle: string }[]
+  busy: boolean
+  handleInput: string
+  manual: { handle: string; views: string; caption: string; baseline: string }
+  notice: string
+  apify: boolean
+  onHandleInput: (v: string) => void
+  onManual: (v: { handle: string; views: string; caption: string; baseline: string }) => void
+  onAddAccount: () => void
+  onRemoveAccount: (handle: string) => void
+  onRun: () => void
+  onManualAdd: () => void
+  onScript: (reelId: string) => void
+}) {
   return (
     <section className="panel">
       <div className="metric-row">
         <div className="metric">
-          <strong>6</strong>
+          <strong>{props.accounts.length}</strong>
           <span>comptes suivis</span>
         </div>
         <div className="metric">
-          <strong>14</strong>
-          <span>exceptions détectées</span>
+          <strong>{props.hits.length}</strong>
+          <span>exceptions ≥ 2,5×</span>
         </div>
         <div className="metric">
-          <strong>22×</strong>
-          <span>meilleur score viral</span>
+          <strong>{props.hits[0] ? `${props.hits[0].score.toFixed(1)}×` : '—'}</strong>
+          <span>meilleur score</span>
         </div>
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Comptes surveillés</h3>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Tes concurrents</h3>
+        <div className="chat-input" style={{ marginBottom: 10 }}>
+          <input
+            value={props.handleInput}
+            onChange={(e) => props.onHandleInput(e.target.value)}
+            placeholder="@compte_instagram"
+            aria-label="Ajouter un compte"
+          />
+          <button type="button" className="cta" disabled={props.busy} onClick={props.onAddAccount}>
+            Ajouter
+          </button>
+        </div>
         <div className="accounts">
-          {watchedAccounts.map((a) => (
-            <span className="pill" key={a}>
-              {a}
-            </span>
+          {props.accounts.map((a) => (
+            <button
+              type="button"
+              className="pill"
+              key={a.handle}
+              title="Retirer"
+              onClick={() => props.onRemoveAccount(a.handle)}
+            >
+              @{a.handle} ×
+            </button>
           ))}
+        </div>
+        <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="cta" disabled={props.busy} onClick={props.onRun}>
+            {props.busy ? 'Veille…' : props.apify ? 'Lancer la veille Apify' : 'Recalculer la veille'}
+          </button>
+        </div>
+        {props.notice && (
+          <p style={{ color: 'var(--muted)', marginBottom: 0, marginTop: 10 }}>{props.notice}</p>
+        )}
+        {!props.apify && (
+          <p style={{ color: 'var(--muted)', marginBottom: 0, marginTop: 10 }}>
+            Sans APIFY_TOKEN : utilise les seeds ou ajoute un Reel à la main ci-dessous.
+          </p>
+        )}
+      </div>
+
+      <div className="card">
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Ajouter un Reel à la main</h3>
+        <div className="manual-grid">
+          <input
+            value={props.manual.handle}
+            onChange={(e) => props.onManual({ ...props.manual, handle: e.target.value })}
+            placeholder="@compte"
+          />
+          <input
+            value={props.manual.views}
+            onChange={(e) => props.onManual({ ...props.manual, views: e.target.value })}
+            placeholder="vues (ex 842000)"
+            inputMode="numeric"
+          />
+          <input
+            value={props.manual.baseline}
+            onChange={(e) => props.onManual({ ...props.manual, baseline: e.target.value })}
+            placeholder="baseline habituelle (ex 38000)"
+            inputMode="numeric"
+          />
+          <input
+            value={props.manual.caption}
+            onChange={(e) => props.onManual({ ...props.manual, caption: e.target.value })}
+            placeholder="accroche / caption"
+          />
+          <button type="button" className="cta" disabled={props.busy} onClick={props.onManualAdd}>
+            Enregistrer
+          </button>
         </div>
       </div>
 
-      {reelHits.map((reel) => (
+      {props.hits.map((reel) => (
         <article className="reel" key={reel.id}>
-          <div className="thumb">{reel.views}</div>
+          <div className="thumb">{formatViews(reel.views)}</div>
           <div>
-            <h4>{reel.title}</h4>
+            <h4>{reel.caption || 'Reel sans caption'}</h4>
             <p>
-              {reel.account} · baseline {reel.baseline}
+              @{reel.handle} · baseline {formatViews(reel.baseline)}
             </p>
             <p>{reel.why}</p>
+            <button
+              type="button"
+              className="cta ghost"
+              style={{ marginTop: 8 }}
+              disabled={props.busy}
+              onClick={() => props.onScript(reel.id)}
+            >
+              Générer le script →
+            </button>
           </div>
           <div className="score">
             <strong>{reel.score.toFixed(1)}×</strong>
@@ -138,14 +364,29 @@ function VeillePanel() {
   )
 }
 
-function ScriptPanel() {
+function ScriptPanel({ script }: { script: GeneratedScript | null }) {
+  if (!script) {
+    return (
+      <section className="panel">
+        <div className="card">
+          <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Pas encore de script</h3>
+          <p style={{ color: 'var(--muted)', marginBottom: 0 }}>
+            Depuis Veille, clique « Générer le script » sur une exception.
+          </p>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="panel">
       <article className="script">
-        <h3>Script · Hook avant / après</h3>
-        <p className="meta">Dans ta voix · 18s · 2 légendes prêtes</p>
-        {scriptBeats.map((beat) => (
-          <div className="beat" key={beat.time}>
+        <h3>{script.title}</h3>
+        <p className="meta">
+          Généré {new Date(script.createdAt).toLocaleString('fr-FR')} · {script.beats.length} beats
+        </p>
+        {script.beats.map((beat) => (
+          <div className="beat" key={`${beat.time}-${beat.subtitle}`}>
             <time>{beat.time}</time>
             <div>
               <strong>{beat.tone}</strong>
@@ -158,38 +399,64 @@ function ScriptPanel() {
       <div className="card feature">
         <h3>Légendes</h3>
         <p>
-          <strong>A — punchy :</strong> « Le vrai signal n’est pas le volume. C’est le multiple. »
+          <strong>A — punchy :</strong> {script.captions.punchy}
         </p>
         <p>
-          <strong>B — soft :</strong> « J’ai arrêté de chase les vues brutes. Voici comment Zack lit un Reel. »
+          <strong>B — soft :</strong> {script.captions.soft}
         </p>
       </div>
     </section>
   )
 }
 
-function CalendarPanel() {
+function CalendarPanel({
+  items,
+  onAdd,
+}: {
+  items: CalendarItem[]
+  onAdd: (day: number, label: string) => void
+}) {
+  const [label, setLabel] = useState('')
+  const [day, setDay] = useState('18')
+  const now = new Date()
+  const year = items[0]?.year ?? now.getFullYear()
+  const month = items[0]?.month ?? now.getMonth() + 1
   const days = Array.from({ length: 28 }, (_, i) => i + 1)
-  const byDay = Object.fromEntries(calendarItems.map((c) => [c.day, c]))
+  const byDay = Object.fromEntries(items.filter((c) => c.month === month).map((c) => [c.day, c]))
 
   return (
     <section className="panel calendar">
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Août 2026</h3>
-        <p style={{ color: 'var(--muted)', marginTop: 0 }}>
-          Écrit · Tourné · Publié — glisse une idée, la semaine se remplit.
-        </p>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>
+          {String(month).padStart(2, '0')}/{year}
+        </h3>
+        <div className="manual-grid" style={{ marginBottom: 12 }}>
+          <input value={day} onChange={(e) => setDay(e.target.value)} placeholder="jour" />
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="idée / titre" />
+          <button
+            type="button"
+            className="cta"
+            onClick={() => {
+              const d = Number(day)
+              if (!d || !label.trim()) return
+              onAdd(d, label.trim())
+              setLabel('')
+            }}
+          >
+            Ajouter
+          </button>
+        </div>
         <div className="weekdays">
           {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
             <span key={`${d}-${i}`}>{d}</span>
           ))}
         </div>
         <div className="days" style={{ marginTop: 8 }}>
-          {days.map((day) => {
-            const item = byDay[day]
+          {days.map((d) => {
+            const item = byDay[d]
             return (
-              <div className="day" key={day}>
-                <span className="n">{day}</span>
+              <div className="day" key={d}>
+                <span className="n">{d}</span>
                 {item && <span className={`chip ${item.status}`}>{item.label}</span>}
               </div>
             )
@@ -198,18 +465,4 @@ function CalendarPanel() {
       </div>
     </section>
   )
-}
-
-function replyTo(text: string): string {
-  const t = text.toLowerCase()
-  if (t.includes('veille') || t.includes('lance')) {
-    return 'Veille lancée sur 6 comptes. 3 exceptions au-dessus de 9× — je te les affiche dans l’onglet Veille.'
-  }
-  if (t.includes('meilleur') || t.includes('top')) {
-    return 'Top du jour : @atelierlumiere à 22,1× (hook avant/après). Tu veux le script seconde par seconde ?'
-  }
-  if (t.includes('accroche') || t.includes('raccourci') || t.includes('script')) {
-    return 'Accroche raccourcie : « Ton Reel à 3k n’est pas un flop — c’est un mauvais dénominateur. » Je peux découper le script entier.'
-  }
-  return 'OK. Dis-moi : « lance une veille », « montre-moi les meilleurs », ou « raccourcis mon accroche ».'
 }

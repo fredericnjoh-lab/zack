@@ -1,19 +1,34 @@
-# Zack
+# Zack — MVP perso
 
-Veille Instagram → scores viraux → scripts → calendrier de tournage.
+Veille Instagram → score viral (vues / médiane du compte) → script → agenda.
 
-## Dev
+## Démarrer (toi)
 
 ```bash
+cd zack
 npm install --ignore-scripts
 npm run dev
 ```
 
-## Build
+- Web : http://127.0.0.1:5173  
+- API : http://127.0.0.1:8787  
 
-```bash
-npm run build
-npm run preview
-```
+## Utilisation sans clés
 
-Prototype front inspiré du flow Zoe (myzoe.io), rebrandé **Zack**.
+1. Onglet **Veille** — comptes seed déjà là, clique **Recalculer la veille**
+2. Ou **Ajouter un Reel à la main** (handle + vues)
+3. **Générer le script** sur une exception
+4. Agenda pour planifier
+
+## Brancher le vrai Instagram
+
+1. Crée un compte [Apify](https://apify.com) → token
+2. Mets `APIFY_TOKEN=...` dans `.env`
+3. Relance `npm run dev` → **Lancer la veille Apify**
+
+Optionnel : `OPENAI_API_KEY` pour des scripts plus riches (sinon script local).
+
+## Limites honnêtes
+
+- Scraping IG = fragile / ToS Meta — usage perso d’abord
+- Pas encore : transcription audio, OCR overlay, billing multi-clients

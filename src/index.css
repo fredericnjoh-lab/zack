@@ -561,7 +561,30 @@ img {
   font-size: 0.86rem;
 }
 
+.manual-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.manual-grid input {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 12px 16px;
+  background: var(--surface);
+  outline: none;
+  min-width: 0;
+}
+
+.manual-grid .cta {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 640px) {
+  .manual-grid {
+    grid-template-columns: 1fr;
+  }
+
   .metric-row {
     grid-template-columns: 1fr;
   }
