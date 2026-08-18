@@ -1,37 +1,30 @@
-# Zack — MVP perso
+# Zack
 
-Veille Instagram → score viral (vues / médiane du compte) → script → agenda.
+Veille Instagram → score viral → scripts → photos/carrousels → calendrier.
 
-## Démarrer (toi)
+## Local
 
 ```bash
-cd zack
-npm install --ignore-scripts
-npm run dev
+npm install
+cp .env.example .env   # APIFY_TOKEN + ANTHROPIC_API_KEY
+npm run build
+npm start
 ```
 
-- Web : http://127.0.0.1:5173  
-- API : http://127.0.0.1:8787  
+App + API : http://127.0.0.1:8787
 
-## Utilisation sans clés
+## Deploy Render (URL stable)
 
-1. Onglet **Veille** — comptes seed déjà là, clique **Recalculer la veille**
-2. Ou **Ajouter un Reel à la main** (handle + vues)
-3. **Générer le script** sur une exception
-4. Agenda pour planifier
+1. Pousse ce repo sur GitHub (public).
+2. Sur [render.com](https://render.com) → **New** → **Blueprint** → sélectionne le repo (utilise `render.yaml`).
+3. Ajoute les secrets :
+   - `APIFY_TOKEN`
+   - `ANTHROPIC_API_KEY`
+4. Deploy → URL du type `https://zack-xxxx.onrender.com`
 
-## Brancher le vrai Instagram
+Ou manuellement : **New Web Service** → Build `npm install --include=dev && npm run build` → Start `npm start`.
 
-1. Crée un compte [Apify](https://apify.com) → token
-2. Mets `APIFY_TOKEN=...` dans `.env`
-3. Relance `npm run dev` → **Lancer la veille Apify**
+## Notes
 
-Optionnel scripts LLM (dans l’ordre) :
-1. `ANTHROPIC_API_KEY` → **Claude** (recommandé)
-2. sinon `OPENAI_API_KEY`
-3. sinon script local sans clé
-
-## Limites honnêtes
-
-- Scraping IG = fragile / ToS Meta — usage perso d’abord
-- Pas encore : transcription audio, OCR overlay, billing multi-clients
+- Les données (`data/store.json`) sont locales au disque du service (éphémère sur le plan free) : une veille Apify re-remplit tout.
+- Compte Instagram **privé** = non lisible par Apify.
