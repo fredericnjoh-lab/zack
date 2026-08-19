@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { zackApi } from '../lib/api'
+import { dict, type Lang } from '../lib/i18n'
+import { LangToggle } from './StickyHeader'
 import type {
   AutoVeilleSettings,
   CalendarItem,
@@ -18,6 +20,8 @@ type ChatMessage = { from: 'zack' | 'user'; text: string }
 
 type AppShellProps = {
   onBack: () => void
+  lang: Lang
+  onLang: (lang: Lang) => void
 }
 
 function formatViews(n: number): string {
@@ -32,7 +36,8 @@ function imageProxy(source?: string): string | undefined {
   return `/api/image?${params.toString()}`
 }
 
-export function AppShell({ onBack }: AppShellProps) {
+export function AppShell({ onBack, lang, onLang }: AppShellProps) {
+  const t = dict[lang]
   const [tab, setTab] = useState<Tab>('veille')
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -213,16 +218,20 @@ export function AppShell({ onBack }: AppShellProps) {
         <div>
           <h1>Zack</h1>
           <p>
-            {accounts.length} comptes · {hits.length} exceptions
-            {status.apify ? ' · Apify ON' : ' · mode local'}
+            {accounts.length} {lang === 'fr' ? 'marques' : 'brands'} · {hits.length}{' '}
+            {lang === 'fr' ? 'exceptions' : 'outliers'}
+            {status.apify ? ' · Apify ON' : ' · local'}
             {status.openai ? (status.llm === 'claude' ? ' · Claude ON' : ' · LLM ON') : ''}
             {autoVeille.enabled ? ` · auto ${autoVeille.hour}h` : ''}
-            {job.status === 'running' ? ' · veille en cours…' : ''}
+            {job.status === 'running' ? (lang === 'fr' ? ' · veille en cours…' : ' · scanning…') : ''}
           </p>
         </div>
-        <button type="button" className="cta ghost" onClick={onBack}>
-          ← Accueil
-        </button>
+        <div className="header-actions">
+          <LangToggle lang={lang} onLang={onLang} />
+          <button type="button" className="cta ghost" onClick={onBack}>
+            {t.back}
+          </button>
+        </div>
       </div>
 
       {(error || waking) && (
@@ -251,12 +260,12 @@ export function AppShell({ onBack }: AppShellProps) {
       <nav className="tabs tabs-6" aria-label="Navigation Zack">
         {(
           [
-            ['profil', 'Mon profil'],
-            ['veille', 'Veille'],
-            ['photos', 'Photos'],
-            ['script', 'Script'],
-            ['calendrier', 'Agenda'],
-            ['chat', 'Parler'],
+            ['profil', t.tabs.profil],
+            ['veille', t.tabs.veille],
+            ['photos', t.tabs.photos],
+            ['script', t.tabs.script],
+            ['calendrier', t.tabs.calendrier],
+            ['chat', t.tabs.chat],
           ] as const
         ).map(([id, label]) => (
           <button

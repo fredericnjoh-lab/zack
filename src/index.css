@@ -1,29 +1,29 @@
 :root {
-  --bg: #07070c;
-  --bg-soft: rgba(255, 255, 255, 0.04);
-  --surface: rgba(255, 255, 255, 0.055);
-  --surface-strong: rgba(255, 255, 255, 0.09);
-  --ink: #f4f4f8;
-  --muted: #9a9ab0;
-  --line: rgba(255, 255, 255, 0.09);
-  --line-strong: rgba(255, 255, 255, 0.16);
+  --bg: #060608;
+  --bg-soft: rgba(255, 255, 255, 0.03);
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-strong: rgba(255, 255, 255, 0.075);
+  --ink: #f2efe9;
+  --muted: rgba(242, 239, 233, 0.56);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.22);
 
-  --accent: #e0459b;
-  --accent-2: #8b5cf6;
-  --accent-3: #f7a03c;
-  --accent-soft: rgba(224, 69, 155, 0.14);
-  --accent-wash: rgba(139, 92, 246, 0.12);
-  --grad: linear-gradient(115deg, #f7a03c 0%, #e0459b 42%, #8b5cf6 78%, #4f6bf0 100%);
+  --accent: #f2efe9;
+  --accent-2: #f2efe9;
+  --accent-3: #f2efe9;
+  --accent-soft: rgba(242, 239, 233, 0.1);
+  --accent-wash: rgba(242, 239, 233, 0.06);
+  --grad: linear-gradient(180deg, #ffffff 0%, #d9d5cd 100%);
 
-  --blue: #c98ff5;
-  --blue-deep: #8b5cf6;
-  --blue-soft: rgba(139, 92, 246, 0.18);
-  --blue-wash: rgba(139, 92, 246, 0.1);
+  --blue: #f2efe9;
+  --blue-deep: rgba(242, 239, 233, 0.8);
+  --blue-soft: rgba(242, 239, 233, 0.14);
+  --blue-wash: rgba(242, 239, 233, 0.07);
 
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 14px 40px rgba(224, 69, 155, 0.35);
-  --radius: 24px;
-  --radius-sm: 16px;
+  --shadow: none;
+  --shadow-glow: none;
+  --radius: 0px;
+  --radius-sm: 0px;
   --font-display: "Syne", sans-serif;
   --font-body: "Figtree", sans-serif;
 
@@ -54,33 +54,17 @@ body {
   overflow-x: hidden;
 }
 
-/* Aurora backdrop */
-body::before,
-body::after {
+/* Grid backdrop — same universe across landing and app */
+body::before {
   content: '';
   position: fixed;
+  inset: 0;
   z-index: -1;
-  border-radius: 50%;
-  filter: blur(120px);
   pointer-events: none;
-}
-
-body::before {
-  width: 60vw;
-  height: 60vw;
-  top: -22vw;
-  left: -12vw;
-  background: radial-gradient(circle, rgba(224, 69, 155, 0.32), transparent 68%);
-  animation: drift 22s ease-in-out infinite alternate;
-}
-
-body::after {
-  width: 55vw;
-  height: 55vw;
-  top: 18vh;
-  right: -18vw;
-  background: radial-gradient(circle, rgba(93, 110, 240, 0.3), transparent 68%);
-  animation: drift 26s ease-in-out infinite alternate-reverse;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 88px 88px;
 }
 
 button,
@@ -123,12 +107,6 @@ img {
 /* Hide aurora when clinical landing is up */
 .app-root.app-landing {
   background: #060608;
-}
-
-body:has(.app-landing)::before,
-body:has(.app-landing)::after {
-  opacity: 0;
-  visibility: hidden;
 }
 
 .page {
@@ -1478,6 +1456,96 @@ button.pill:hover {
   text-align: left;
 }
 
+/* Shared clinical chrome — app inherits the landing universe */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+}
+
+.lang-btn {
+  padding: 8px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  background: transparent;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.lang-btn.active {
+  color: #0a0a0c;
+  background: var(--ink);
+}
+
+.shell-top h1 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: -0.05em;
+}
+
+.eyebrow,
+.landing-kicker,
+.metric span,
+.tab {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.tab {
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.cta {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.76rem;
+  background: var(--ink);
+  color: #0a0a0c;
+}
+
+.cta:hover {
+  background: #fff;
+  box-shadow: none;
+}
+
+.cta.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+.card,
+.reel,
+.script,
+.day,
+.chip,
+.pill,
+.metric,
+.tabs,
+.tab,
+input,
+textarea,
+select,
+.thumb,
+.profile-post {
+  border-radius: 0 !important;
+}
+
+.proof-item strong,
+.beat time,
+.score strong {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--ink);
+}
+
 @keyframes landing-ken {
   from { transform: scale(1.02); }
   to { transform: scale(1.08); }
@@ -1512,4 +1580,121 @@ button.pill:hover {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* —— Clinical normalize: app inherits the landing language —— */
+.sticky-bar,
+.cta,
+.pill,
+.tab,
+.tabs,
+.seg,
+.seg-btn,
+.chip,
+.card,
+.reel,
+.script,
+.day,
+.thumb,
+.media-thumb,
+.profile-post,
+.remake-why,
+.remake-body,
+.tr-box,
+.doc-area,
+.doc-list li,
+.bubble,
+.metric,
+.chat-input input,
+.manual-grid input,
+.manual-grid textarea,
+.auto-veille-row select,
+input,
+textarea,
+select {
+  border-radius: 0 !important;
+}
+
+.cta,
+.tab.active,
+.seg-btn.active,
+.bubble.user {
+  background: var(--ink) !important;
+  color: #0a0a0c !important;
+  box-shadow: none !important;
+}
+
+.cta.ghost {
+  background: transparent !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line-strong);
+}
+
+.cta.ghost:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.cta:hover {
+  transform: none;
+}
+
+.profile-hero,
+.remake-why {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-left: 2px solid var(--ink);
+}
+
+.feature svg,
+.feature .icon,
+.thumb,
+.media-thumb {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--ink) !important;
+  box-shadow: none !important;
+}
+
+.section-title,
+.metric strong,
+.score strong,
+.beat time,
+.proof-item strong,
+.remake-body label,
+.hero h1 {
+  background: none !important;
+  -webkit-text-fill-color: var(--ink);
+  color: var(--ink) !important;
+}
+
+.chat-input input:focus,
+.manual-grid input:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--line-strong) !important;
+  box-shadow: none !important;
+  outline: 1px solid rgba(242, 239, 233, 0.35);
+  outline-offset: -1px;
+}
+
+button.pill:hover {
+  border-color: var(--line-strong) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Status stays readable without candy colors */
+.chip {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--ink) !important;
+  border-left: 2px solid rgba(242, 239, 233, 0.35);
+}
+
+.chip.tourne { border-left-color: rgba(242, 239, 233, 0.65); }
+.chip.publie {
+  border-left-color: var(--ink);
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.shell-top h1,
+.landing-brand {
+  text-transform: uppercase;
 }
