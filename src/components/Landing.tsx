@@ -1,147 +1,88 @@
-import { Icon } from './Icon'
-
-const steps = [
-  {
-    icon: 'search' as const,
-    title: '1. Il surveille',
-    body: 'Tu lui donnes 3 à 20 marques concurrentes (streetwear, ready-to-wear, DTC). Zack scrape leurs Reels et calcule le score viral : combien de fois un post dépasse l’audience habituelle de la marque.',
-  },
-  {
-    icon: 'bolt' as const,
-    title: '2. Il détecte',
-    body: 'Pas le post avec le plus de vues brutes : les vraies exceptions — drop, fit check ou lookbook qui explosent par rapport au rythme normal du concurrent.',
-  },
-  {
-    icon: 'pen' as const,
-    title: '3. Il écrit',
-    body: 'Tu choisis le Reel, Zack lit le texte à l’écran et en tire un script seconde par seconde dans la voix de ta marque : timing, ton, sous-titres. Prêt à tourner le prochain drop.',
-  },
-]
-
-const extras = [
-  {
-    icon: 'calendar' as const,
-    title: 'Calendrier de tournage',
-    body: 'Glisse une idée drop / fit / packing sur un jour. Vue mois : écrit, tourné, publié — comme un planning collection.',
-  },
-  {
-    icon: 'image' as const,
-    title: 'Photos & carrousels produit',
-    body: 'Zack sort les lookbooks et carrousels qui cartonnent, explique pourquoi, puis les refait : à l’identique, ou dans l’ADN de ta marque.',
-  },
-  {
-    icon: 'book' as const,
-    title: 'Voix de marque, apprise',
-    body: 'Dépose ton brand book, tes slogans, tes règles. Quand tu corriges un script, Zack retient la règle pour tous les suivants.',
-  },
-  {
-    icon: 'clock' as const,
-    title: 'Palmarès du matin',
-    body: 'Veille auto sur tes concurrents mode. Ton top exceptions est prêt avant le café — sans ouvrir Instagram.',
-  },
-  {
-    icon: 'compass' as const,
-    title: 'Découverte de marques',
-    body: 'Zack te propose des marques du même segment (prix, style, geo) que tu ne suis pas encore, avec un vrai signal de perf.',
-  },
-  {
-    icon: 'chat' as const,
-    title: 'Parle à Zack',
-    body: '« lance une veille », « montre le top drop », « raccourcis mon accroche ». Il agit — scrape, score, script.',
-  },
-  {
-    icon: 'grid' as const,
-    title: 'OCR & légendes produit',
-    body: 'Même sans voix-off : Zack lit le texte à l’écran du Reel. Tu repars avec deux légendes prêtes à coller (punchy / soft).',
-  },
-]
-
-const angles = [
-  { label: 'Drop', hint: 'lancement / restock' },
-  { label: 'Fit check', hint: 'porté, rue, studio' },
-  { label: 'Packing', hint: 'unboxing marque' },
-  { label: 'Behind the stitch', hint: 'coulisses atelier' },
-  { label: 'Social proof', hint: 'UGC / clients' },
-  { label: 'Lookbook', hint: 'carrousel collection' },
-]
-
 type LandingProps = {
   onTry: () => void
 }
 
+const flow = [
+  {
+    n: '01',
+    title: 'Surveille',
+    body: '3 à 20 marques concurrentes. Scrape réel. Score viral = perf ÷ médiane du compte.',
+  },
+  {
+    n: '02',
+    title: 'Détecte',
+    body: 'Uniquement les exceptions. Drop, fit, lookbook qui sortent du rythme habituel.',
+  },
+  {
+    n: '03',
+    title: 'Produis',
+    body: 'Script seconde par seconde, OCR écran, légendes, remake dans la voix de ta marque.',
+  },
+]
+
+const stack = [
+  { label: 'Signal', value: 'Score × vs médiane marque — pas les vues brutes' },
+  { label: 'Capture', value: 'OCR du texte à l’écran + structure du Reel' },
+  { label: 'Voix', value: 'Brand book, règles retenues, ton manifesto' },
+  { label: 'Rythme', value: 'Palmarès auto le matin · agenda écrit / tourné / publié' },
+]
+
 export function Landing({ onTry }: LandingProps) {
   return (
-    <main className="page">
-      <section className="hero">
-        <p className="eyebrow">Zack · marques de vêtements</p>
-        <h1>Zack travaille, tu drops</h1>
-        <p>
-          La veille Instagram des marques de mode — score viral concurrent, script
-          prêt à filmer, calendrier de tournage. Propulsé par scrape réel + Claude.
-        </p>
-        <div className="hero-actions">
-          <button type="button" className="cta" onClick={onTry}>
-            Essayer Zack →
-          </button>
-          <span className="hero-note">Streetwear · DTC · ready-to-wear</span>
+    <main className="landing">
+      <section className="landing-hero" aria-label="Zack">
+        <div className="landing-hero-media" aria-hidden="true">
+          <img src={`${import.meta.env.BASE_URL}zack-hero-fashion.jpg`} alt="" />
         </div>
-        <div className="angle-strip" aria-label="Angles mode">
-          {angles.map((a) => (
-            <span className="angle-chip" key={a.label}>
-              <strong>{a.label}</strong>
-              <span>{a.hint}</span>
-            </span>
+        <div className="landing-hero-veil" aria-hidden="true" />
+        <div className="landing-hero-copy">
+          <p className="landing-brand">Zack</p>
+          <h1>Veille Instagram pour marques de vêtements.</h1>
+          <p className="landing-lead">
+            Concurrent → exception → script. Scrape réel, score viral, Claude.
+          </p>
+          <div className="landing-cta-row">
+            <button type="button" className="cta landing-cta" onClick={onTry}>
+              Ouvrir Zack
+            </button>
+            <p className="landing-meta">Streetwear · DTC · ready-to-wear</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-block">
+        <p className="landing-kicker">Système</p>
+        <ol className="landing-flow">
+          {flow.map((step) => (
+            <li key={step.n}>
+              <span className="landing-n">{step.n}</span>
+              <div>
+                <h2>{step.title}</h2>
+                <p>{step.body}</p>
+              </div>
+            </li>
           ))}
-        </div>
-        <div className="proof">
-          {[
-            { value: 'Score ×', label: 'vs médiane marque' },
-            { value: 'OCR', label: 'texte à l’écran' },
-            { value: '7h', label: 'palmarès auto' },
-          ].map((item) => (
-            <div className="proof-item" key={item.label}>
-              <strong>{item.value}</strong>
-              <span>{item.label}</span>
+        </ol>
+      </section>
+
+      <section className="landing-block">
+        <p className="landing-kicker">Levier tech</p>
+        <h2 className="landing-block-title">Pas un générateur de captions. Un pipeline.</h2>
+        <dl className="landing-stack">
+          {stack.map((row) => (
+            <div key={row.label} className="landing-stack-row">
+              <dt>{row.label}</dt>
+              <dd>{row.value}</dd>
             </div>
           ))}
-        </div>
+        </dl>
       </section>
 
-      <section className="section">
-        <div className="section-head">
-          <p className="eyebrow">Comment ça marche</p>
-          <h2 className="section-title">Surveille. Détecte. Filme.</h2>
-        </div>
-        <div className="steps">
-          {steps.map((step) => (
-            <article className="card feature" key={step.title}>
-              <Icon name={step.icon} />
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="section-head">
-          <p className="eyebrow">Fait pour les marques</p>
-          <h2 className="section-title">Du concurrent au prochain drop</h2>
-        </div>
-        {extras.map((item) => (
-          <article className="card feature" key={item.title}>
-            <Icon name={item.icon} />
-            <h3>{item.title}</h3>
-            <p>{item.body}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="footer-cta">
-        <h2 className="section-title">Prêt à outfiler ta veille ?</h2>
-        <p>Ajoute tes marques concurrentes, lance une veille, récupère un script.</p>
-        <button type="button" className="cta" onClick={onTry}>
-          Essayer Zack →
+      <section className="landing-block landing-end">
+        <p className="landing-brand landing-brand-sm">Zack</p>
+        <h2 className="landing-block-title">Ajoute tes concurrents. Filme demain.</h2>
+        <button type="button" className="cta landing-cta" onClick={onTry}>
+          Ouvrir Zack
         </button>
       </section>
     </main>

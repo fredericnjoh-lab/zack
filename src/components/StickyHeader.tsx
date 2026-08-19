@@ -3,17 +3,14 @@ type StickyHeaderProps = {
   ctaLabel?: string
 }
 
-export function StickyHeader({ onTry, ctaLabel = 'Essayer Zack →' }: StickyHeaderProps) {
+export function StickyHeader({ onTry, ctaLabel = 'Ouvrir Zack' }: StickyHeaderProps) {
   return (
-    <header className="sticky-bar">
+    <header className="sticky-bar sticky-clinical">
       <div className="brand">
-        <img src={`${import.meta.env.BASE_URL}zack-avatar.png`} alt="Zack" />
-        <div>
-          <strong>Zack</strong>
-          <span>marques de vêtements</span>
-        </div>
+        <strong>Zack</strong>
+        <span>marques de vêtements</span>
       </div>
-      <button type="button" className="cta" onClick={onTry}>
+      <button type="button" className="cta ghost" onClick={onTry}>
         {ctaLabel}
       </button>
     </header>

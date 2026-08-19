@@ -15,7 +15,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-root">
+    <div className="app-root app-landing">
       <StickyHeader onTry={() => setMode('app')} />
       <Landing onTry={() => setMode('app')} />
     </div>
