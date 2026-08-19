@@ -17,6 +17,7 @@ import type {
 
 type Tab = 'profil' | 'veille' | 'photos' | 'script' | 'calendrier' | 'chat'
 type ChatMessage = { from: 'zack' | 'user'; text: string }
+type AppCopy = (typeof dict)['fr']['app']
 
 type AppShellProps = {
   onBack: () => void
@@ -38,13 +39,9 @@ function imageProxy(source?: string): string | undefined {
 
 export function AppShell({ onBack, lang, onLang }: AppShellProps) {
   const t = dict[lang]
+  const c = t.app
   const [tab, setTab] = useState<Tab>('veille')
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      from: 'zack',
-      text: 'Salut — ajoute tes marques concurrentes, lance une veille, ou colle un Reel drop/fit. Qu’est-ce qu’on fait ?',
-    },
-  ])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState('')
   const [hits, setHits] = useState<ScoredReel[]>([])
   const [accounts, setAccounts] = useState<{ handle: string }[]>([])
@@ -78,14 +75,19 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
   const [handleInput, setHandleInput] = useState('')
   const [manual, setManual] = useState({ handle: '', views: '', caption: '', baseline: '' })
 
+  // The greeting follows the active language until the user starts talking.
+  useEffect(() => {
+    setMessages((prev) => (prev.length > 1 ? prev : [{ from: 'zack', text: c.chatGreeting }]))
+  }, [c.chatGreeting])
+
   async function refresh() {
     setWaking(true)
     try {
-      const [v, c, s, p, own, tr] = await Promise.all([
-        zackApi.veille(),
+      const [v, cal, s, p, own, tr] = await Promise.all([
+        zackApi.veille(lang),
         zackApi.calendar(),
         zackApi.scripts(),
-        zackApi.photos(),
+        zackApi.photos(lang),
         zackApi.profile(),
         zackApi.transcriptions(),
       ])
@@ -101,7 +103,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
       if (v.autoVeille) setAutoVeille(v.autoVeille)
       if (v.job) setJob(v.job)
       setDiscoveries(v.discoveries || [])
-      setCalendar(c.items)
+      setCalendar(cal.items)
       if (s.scripts[0]) setScript(s.scripts[0])
       setPhotoHits(p.hits)
       setProfile(own.profile)
@@ -112,17 +114,10 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
         for (const rm of p.remakes) if (!next[rm.sourceReelId]) next[rm.sourceReelId] = rm
         return next
       })
-      setTranscriptions(
-        Object.fromEntries(tr.transcriptions.map((t) => [t.reelId, t])),
-      )
+      setTranscriptions(Object.fromEntries(tr.transcriptions.map((item) => [item.reelId, item])))
       setError('')
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? `${e.message} — le serveur Render se réveille (30–60 s), réessai auto…`
-          : 'API indisponible — réveil Render en cours…',
-      )
-      // One more delayed retry after cold start
+      setError(e instanceof Error ? c.coldStart(e.message) : c.apiDown)
       setTimeout(() => {
         void refreshQuiet()
       }, 8000)
@@ -133,7 +128,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
   async function refreshQuiet() {
     try {
-      const v = await zackApi.veille()
+      const v = await zackApi.veille(lang)
       setHits(v.hits)
       setAccounts(v.accounts)
       if (v.autoVeille) setAutoVeille(v.autoVeille)
@@ -154,9 +149,8 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
   useEffect(() => {
     void refresh()
-  }, [])
+  }, [lang])
 
-  // Poll while a background veille is running
   useEffect(() => {
     if (job.status !== 'running') return
     const id = setInterval(() => {
@@ -166,11 +160,11 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
           setJob(next)
           if (next.status === 'ok') {
             await refreshQuiet()
-            setStatus((s) => ({ ...s, notice: next.summary || 'Veille terminée.' }))
+            setStatus((s) => ({ ...s, notice: next.summary || c.veilleDone }))
             setBusy(false)
           }
           if (next.status === 'error') {
-            setError(next.error || 'Veille échouée')
+            setError(next.error || c.veilleFailed)
             setBusy(false)
           }
         } catch {
@@ -179,7 +173,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
       })()
     }, 2500)
     return () => clearInterval(id)
-  }, [job.status])
+  }, [job.status, c.veilleDone, c.veilleFailed])
 
   async function send() {
     const text = draft.trim()
@@ -187,7 +181,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
     setDraft('')
     setMessages((prev) => [...prev, { from: 'user', text }])
     try {
-      const result = await zackApi.chat(text)
+      const result = await zackApi.chat(text, lang)
       setMessages((prev) => [...prev, { from: 'zack', text: result.reply }])
       if (result.hits) setHits(result.hits)
       if (result.script) {
@@ -205,10 +199,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
         await refresh()
       }
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { from: 'zack', text: 'API offline. Relance `npm run dev` dans le dossier zack.' },
-      ])
+      setMessages((prev) => [...prev, { from: 'zack', text: c.apiOffline }])
     }
   }
 
@@ -218,12 +209,11 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
         <div>
           <h1>Zack</h1>
           <p>
-            {accounts.length} {lang === 'fr' ? 'marques' : 'brands'} · {hits.length}{' '}
-            {lang === 'fr' ? 'exceptions' : 'outliers'}
-            {status.apify ? ' · Apify ON' : ' · local'}
+            {accounts.length} {c.brands} · {hits.length} {c.outliers}
+            {status.apify ? ' · Apify ON' : ` · ${c.localMode}`}
             {status.openai ? (status.llm === 'claude' ? ' · Claude ON' : ' · LLM ON') : ''}
             {autoVeille.enabled ? ` · auto ${autoVeille.hour}h` : ''}
-            {job.status === 'running' ? (lang === 'fr' ? ' · veille en cours…' : ' · scanning…') : ''}
+            {job.status === 'running' ? ` · ${c.scanning}` : ''}
           </p>
         </div>
         <div className="header-actions">
@@ -236,13 +226,16 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
       {(error || waking) && (
         <div className="card" style={{ borderColor: error ? '#fca5a5' : 'var(--line)', marginBottom: 12 }}>
-          <strong>{waking && !error ? 'Connexion' : 'API'}</strong>
-          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>
-            {error || 'Réveil du serveur Render…'}
-          </p>
+          <strong>{waking && !error ? c.connection : c.api}</strong>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>{error || c.wakingUp}</p>
           {error && (
-            <button type="button" className="cta ghost" style={{ marginTop: 8 }} onClick={() => void refresh()}>
-              Réessayer
+            <button
+              type="button"
+              className="cta ghost"
+              style={{ marginTop: 8 }}
+              onClick={() => void refresh()}
+            >
+              {c.retry}
             </button>
           )}
         </div>
@@ -250,14 +243,12 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
       {job.status === 'running' && (
         <div className="card" style={{ marginBottom: 12 }}>
-          <strong>Veille en cours</strong>
-          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>
-            Apify scrape tes comptes (1–3 min). La page se met à jour automatiquement.
-          </p>
+          <strong>{c.jobRunningTitle}</strong>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>{c.jobRunningBody}</p>
         </div>
       )}
 
-      <nav className="tabs tabs-6" aria-label="Navigation Zack">
+      <nav className="tabs tabs-6" aria-label="Zack">
         {(
           [
             ['profil', t.tabs.profil],
@@ -281,6 +272,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
       {tab === 'profil' && (
         <ProfilePanel
+          c={c}
           profile={profile}
           writingGuide={writingGuide}
           handle={profileHandle}
@@ -294,7 +286,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
               const result = await zackApi.analyzeProfile(profileHandle)
               setProfile(result.profile)
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'analyse profil échouée')
+              setError(e instanceof Error ? e.message : c.errProfile)
             } finally {
               setBusy(false)
             }
@@ -305,7 +297,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
               const r = await zackApi.addDocument(name, content)
               setWritingGuide(r.writingGuide)
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'upload échoué')
+              setError(e instanceof Error ? e.message : c.errUpload)
             } finally {
               setBusy(false)
             }
@@ -324,6 +316,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
       {tab === 'veille' && (
         <VeillePanel
+          c={c}
           hits={hits}
           accounts={accounts}
           busy={busy}
@@ -344,7 +337,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
               setHandleInput('')
               await refresh()
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'erreur')
+              setError(e instanceof Error ? e.message : c.errGeneric)
             } finally {
               setBusy(false)
             }
@@ -363,7 +356,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
               setStatus((s) => ({ ...s, mode: r.mode, notice: r.notice || '' }))
               if (r.job?.status !== 'running') setBusy(false)
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'veille failed')
+              setError(e instanceof Error ? e.message : c.errVeille)
               setBusy(false)
             }
           }}
@@ -383,7 +376,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
               setManual({ handle: '', views: '', caption: '', baseline: '' })
               await refresh()
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'erreur')
+              setError(e instanceof Error ? e.message : c.errGeneric)
             } finally {
               setBusy(false)
             }
@@ -391,11 +384,11 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
           onScript={async (reelId) => {
             setBusy(true)
             try {
-              const r = await zackApi.generateScript(reelId)
+              const r = await zackApi.generateScript(reelId, lang)
               setScript(r.script)
               setTab('script')
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'script failed')
+              setError(e instanceof Error ? e.message : c.errScript)
             } finally {
               setBusy(false)
             }
@@ -403,10 +396,10 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
           onTranscribe={async (reelId) => {
             setBusy(true)
             try {
-              const r = await zackApi.transcribe(reelId)
+              const r = await zackApi.transcribe(reelId, lang)
               setTranscriptions((prev) => ({ ...prev, [reelId]: r.transcription }))
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'transcription échouée')
+              setError(e instanceof Error ? e.message : c.errTranscribe)
             } finally {
               setBusy(false)
             }
@@ -418,10 +411,10 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
           onDiscover={async () => {
             setBusy(true)
             try {
-              const r = await zackApi.discover()
+              const r = await zackApi.discover(lang)
               setDiscoveries(r.discoveries)
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'découverte échouée')
+              setError(e instanceof Error ? e.message : c.errDiscover)
             } finally {
               setBusy(false)
             }
@@ -432,7 +425,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
               await zackApi.addAccount(handle)
               await refresh()
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'erreur')
+              setError(e instanceof Error ? e.message : c.errGeneric)
             } finally {
               setBusy(false)
             }
@@ -442,16 +435,17 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
       {tab === 'photos' && (
         <PhotosPanel
+          c={c}
           hits={photoHits}
           remakes={remakes}
           busy={busy}
           onRemake={async (reelId) => {
             setBusy(true)
             try {
-              const r = await zackApi.remakePhoto(reelId)
+              const r = await zackApi.remakePhoto(reelId, lang)
               setRemakes((prev) => ({ ...prev, [reelId]: r.remake }))
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'remake failed')
+              setError(e instanceof Error ? e.message : c.errRemake)
             } finally {
               setBusy(false)
             }
@@ -461,16 +455,17 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
       {tab === 'script' && (
         <ScriptPanel
+          c={c}
           script={script}
           busy={busy}
           onShorten={async () => {
             if (!script) return
             setBusy(true)
             try {
-              const r = await zackApi.shortenScript(script.id)
+              const r = await zackApi.shortenScript(script.id, lang)
               setScript(r.script)
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'raccourci échoué')
+              setError(e instanceof Error ? e.message : c.errShorten)
             } finally {
               setBusy(false)
             }
@@ -485,18 +480,19 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 
       {tab === 'calendrier' && (
         <CalendarPanel
+          c={c}
           items={calendar}
           onAdd={async (day, label) => {
             await zackApi.addCalendar({ day, label, status: 'ecrit' })
-            const c = await zackApi.calendar()
-            setCalendar(c.items)
+            const cal = await zackApi.calendar()
+            setCalendar(cal.items)
           }}
           onMove={async (id, day) => {
             const r = await zackApi.patchCalendar(id, { day })
             setCalendar(r.items)
           }}
-          onCycleStatus={async (id, status) => {
-            const r = await zackApi.patchCalendar(id, { status })
+          onCycleStatus={async (id, itemStatus) => {
+            const r = await zackApi.patchCalendar(id, { status: itemStatus })
             setCalendar(r.items)
           }}
         />
@@ -513,14 +509,14 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="lance une veille…"
+              placeholder={c.chatPlaceholder}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void send()
               }}
-              aria-label="Message à Zack"
+              aria-label={c.chatAria}
             />
             <button type="button" className="cta" onClick={() => void send()}>
-              Envoyer
+              {c.chatSend}
             </button>
           </div>
         </section>
@@ -530,6 +526,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
 }
 
 function ProfilePanel(props: {
+  c: AppCopy
   profile: ProfileAnalysis | null
   writingGuide: WritingGuide
   handle: string
@@ -540,6 +537,7 @@ function ProfilePanel(props: {
   onRemoveDocument: (id: string) => void
   onRememberRule: (rule: string) => void
 }) {
+  const { c } = props
   const [docName, setDocName] = useState('')
   const [docContent, setDocContent] = useState('')
   const [ruleDraft, setRuleDraft] = useState('')
@@ -548,42 +546,37 @@ function ProfilePanel(props: {
     <section className="panel">
       <div className="card profile-hero">
         <div>
-          <span className="eyebrow">ADN de marque</span>
-          <h3>Apprends à Zack la voix de ta marque</h3>
-          <p>
-            Zack analyse tes publications, ton ton streetwear / DTC, tes piliers — et apprend aussi
-            de ton brand book et des règles que tu retiens.
-          </p>
+          <span className="eyebrow">{c.dnaKicker}</span>
+          <h3>{c.dnaTitle}</h3>
+          <p>{c.dnaBody}</p>
         </div>
         <div className="chat-input">
           <input
             value={props.handle}
             onChange={(e) => props.onHandle(e.target.value)}
-            placeholder="@ton_compte_instagram"
-            aria-label="Ton profil Instagram"
+            placeholder={c.handlePlaceholder}
+            aria-label={c.handleAria}
           />
           <button type="button" className="cta" disabled={props.busy} onClick={props.onAnalyze}>
-            {props.busy ? 'Analyse 1–3 min…' : 'Analyser mon profil'}
+            {props.busy ? c.analyzing : c.analyze}
           </button>
         </div>
       </div>
 
       <div className="card feature">
-        <h3>Ta méthode d’écriture</h3>
-        <p style={{ color: 'var(--muted)' }}>
-          Dépose un brief, un guide de ton, ou un vieux script. Zack s’en sert pour les prochains.
-        </p>
+        <h3>{c.methodTitle}</h3>
+        <p style={{ color: 'var(--muted)' }}>{c.methodBody}</p>
         <div className="manual-grid">
           <input
             value={docName}
             onChange={(e) => setDocName(e.target.value)}
-            placeholder="Nom du document"
+            placeholder={c.docNamePlaceholder}
           />
           <textarea
             className="doc-area"
             value={docContent}
             onChange={(e) => setDocContent(e.target.value)}
-            placeholder="Colle ton guide / brief ici…"
+            placeholder={c.docContentPlaceholder}
             rows={5}
           />
           <button
@@ -596,7 +589,7 @@ function ProfilePanel(props: {
               setDocContent('')
             }}
           >
-            Déposer le document
+            {c.docSubmit}
           </button>
         </div>
         {props.writingGuide.documents.length > 0 && (
@@ -606,7 +599,7 @@ function ProfilePanel(props: {
                 <strong>{d.name}</strong>
                 <span>{d.content.slice(0, 80)}…</span>
                 <button type="button" className="cta ghost" onClick={() => props.onRemoveDocument(d.id)}>
-                  Retirer
+                  {c.remove}
                 </button>
               </li>
             ))}
@@ -616,7 +609,7 @@ function ProfilePanel(props: {
           <input
             value={ruleDraft}
             onChange={(e) => setRuleDraft(e.target.value)}
-            placeholder="Règle à retenir (ex. max 8 mots dans l’accroche)"
+            placeholder={c.rulePlaceholder}
           />
           <button
             type="button"
@@ -627,7 +620,7 @@ function ProfilePanel(props: {
               setRuleDraft('')
             }}
           >
-            Retenir
+            {c.remember}
           </button>
         </div>
         {props.writingGuide.learnedRules.length > 0 && (
@@ -646,20 +639,20 @@ function ProfilePanel(props: {
           <div className="metric-row">
             <div className="metric">
               <strong>{props.profile.postsAnalyzed}</strong>
-              <span>publications analysées</span>
+              <span>{c.postsAnalyzed}</span>
             </div>
             <div className="metric">
               <strong>{props.profile.pillars.length}</strong>
-              <span>piliers éditoriaux</span>
+              <span>{c.pillarsCount}</span>
             </div>
             <div className="metric">
               <strong>@{props.profile.handle}</strong>
-              <span>profil appris</span>
+              <span>{c.profileLearned}</span>
             </div>
           </div>
 
           <div className="card feature">
-            <h3>Ta voix</h3>
+            <h3>{c.yourVoice}</h3>
             <p>{props.profile.voice}</p>
             <div className="accounts">
               {props.profile.rules.map((rule) => (
@@ -672,7 +665,7 @@ function ProfilePanel(props: {
 
           <div className="profile-grid">
             <div className="card feature">
-              <h3>Piliers</h3>
+              <h3>{c.pillars}</h3>
               <ul>
                 {props.profile.pillars.map((x) => (
                   <li key={x}>{x}</li>
@@ -680,7 +673,7 @@ function ProfilePanel(props: {
               </ul>
             </div>
             <div className="card feature">
-              <h3>Forces</h3>
+              <h3>{c.strengths}</h3>
               <ul>
                 {props.profile.strengths.map((x) => (
                   <li key={x}>{x}</li>
@@ -688,7 +681,7 @@ function ProfilePanel(props: {
               </ul>
             </div>
             <div className="card feature">
-              <h3>Opportunités</h3>
+              <h3>{c.opportunities}</h3>
               <ul>
                 {props.profile.opportunities.map((x) => (
                   <li key={x}>{x}</li>
@@ -701,12 +694,12 @@ function ProfilePanel(props: {
             {props.profile.posts.slice(0, 12).map((post) => (
               <a href={post.url} target="_blank" rel="noreferrer" className="profile-post" key={post.id}>
                 {post.imageUrl ? (
-                  <img src={imageProxy(post.imageUrl)} alt={`Publication @${post.handle}`} loading="lazy" />
+                  <img src={imageProxy(post.imageUrl)} alt={c.postAlt(post.handle)} loading="lazy" />
                 ) : (
                   <span>{post.mediaType === 'carousel' ? '❏' : '▶'}</span>
                 )}
                 <small>
-                  {formatViews(post.views)} {post.mediaType === 'reel' ? 'vues' : 'likes'}
+                  {formatViews(post.views)} {post.mediaType === 'reel' ? c.views : c.likes}
                 </small>
               </a>
             ))}
@@ -718,6 +711,7 @@ function ProfilePanel(props: {
 }
 
 function VeillePanel(props: {
+  c: AppCopy
   hits: ScoredReel[]
   accounts: { handle: string }[]
   busy: boolean
@@ -740,34 +734,36 @@ function VeillePanel(props: {
   onDiscover: () => void
   onFollowDiscovery: (handle: string) => void
 }) {
+  const { c } = props
+
   return (
     <section className="panel">
       <div className="metric-row">
         <div className="metric">
           <strong>{props.accounts.length}</strong>
-          <span>comptes suivis</span>
+          <span>{c.followed}</span>
         </div>
         <div className="metric">
           <strong>{props.hits.length}</strong>
-          <span>exceptions ≥ 2,5×</span>
+          <span>{c.outliersThreshold}</span>
         </div>
         <div className="metric">
           <strong>{props.hits[0] ? `${props.hits[0].score.toFixed(1)}×` : '—'}</strong>
-          <span>meilleur score</span>
+          <span>{c.bestScore}</span>
         </div>
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Tes marques concurrentes</h3>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>{c.competitorsTitle}</h3>
         <div className="chat-input" style={{ marginBottom: 10 }}>
           <input
             value={props.handleInput}
             onChange={(e) => props.onHandleInput(e.target.value)}
-            placeholder="@marque_instagram"
-            aria-label="Ajouter un compte"
+            placeholder={c.addBrandPlaceholder}
+            aria-label={c.addBrandAria}
           />
           <button type="button" className="cta" disabled={props.busy} onClick={props.onAddAccount}>
-            Ajouter
+            {c.add}
           </button>
         </div>
         <div className="accounts">
@@ -776,7 +772,7 @@ function VeillePanel(props: {
               type="button"
               className="pill"
               key={a.handle}
-              title="Retirer"
+              title={c.removeTitle}
               onClick={() => props.onRemoveAccount(a.handle)}
             >
               @{a.handle} ×
@@ -785,10 +781,10 @@ function VeillePanel(props: {
         </div>
         <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className="cta" disabled={props.busy} onClick={props.onRun}>
-            {props.busy ? 'Veille…' : props.apify ? 'Lancer la veille Apify' : 'Recalculer la veille'}
+            {props.busy ? c.running : props.apify ? c.runApify : c.recompute}
           </button>
           <button type="button" className="cta ghost" disabled={props.busy} onClick={props.onDiscover}>
-            Découvrir des marques
+            {c.discoverBrands}
           </button>
         </div>
         {props.notice && (
@@ -797,11 +793,8 @@ function VeillePanel(props: {
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Veille automatique</h3>
-        <p style={{ color: 'var(--muted)', marginTop: 0 }}>
-          Active ici + le cron GitHub (chaque matin ~7h Paris). Zack réveille Render et lance la
-          veille tout seul — plus besoin de cliquer.
-        </p>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>{c.autoTitle}</h3>
+        <p style={{ color: 'var(--muted)', marginTop: 0 }}>{c.autoBody}</p>
         <div className="manual-grid auto-veille-row">
           <label className="toggle-row">
             <input
@@ -809,10 +802,10 @@ function VeillePanel(props: {
               checked={props.autoVeille.enabled}
               onChange={(e) => props.onAutoVeille(e.target.checked, props.autoVeille.hour)}
             />
-            Activer
+            {c.enable}
           </label>
           <label>
-            Heure{' '}
+            {c.hour}{' '}
             <select
               value={props.autoVeille.hour}
               onChange={(e) => props.onAutoVeille(props.autoVeille.enabled, Number(e.target.value))}
@@ -832,12 +825,12 @@ function VeillePanel(props: {
 
       {props.discoveries.length > 0 && (
         <div className="card">
-          <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Découverte de marques</h3>
+          <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>{c.discoveryTitle}</h3>
           {props.discoveries.map((d) => (
             <div className="discovery-row" key={d.handle}>
               <div>
                 <strong>@{d.handle}</strong>
-                {d.verified && <span className="pill">vérifié</span>}
+                {d.verified && <span className="pill">{c.verified}</span>}
                 <p style={{ margin: '4px 0', color: 'var(--muted)' }}>{d.reason}</p>
                 <small>
                   {d.nicheFit}
@@ -851,7 +844,7 @@ function VeillePanel(props: {
                 disabled={props.busy || props.accounts.some((a) => a.handle === d.handle)}
                 onClick={() => props.onFollowDiscovery(d.handle)}
               >
-                Suivre
+                {c.follow}
               </button>
             </div>
           ))}
@@ -859,32 +852,32 @@ function VeillePanel(props: {
       )}
 
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Ajouter un Reel à la main</h3>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>{c.manualTitle}</h3>
         <div className="manual-grid">
           <input
             value={props.manual.handle}
             onChange={(e) => props.onManual({ ...props.manual, handle: e.target.value })}
-            placeholder="@compte"
+            placeholder={c.manualHandle}
           />
           <input
             value={props.manual.views}
             onChange={(e) => props.onManual({ ...props.manual, views: e.target.value })}
-            placeholder="vues (ex 842000)"
+            placeholder={c.manualViews}
             inputMode="numeric"
           />
           <input
             value={props.manual.baseline}
             onChange={(e) => props.onManual({ ...props.manual, baseline: e.target.value })}
-            placeholder="baseline habituelle (ex 38000)"
+            placeholder={c.manualBaseline}
             inputMode="numeric"
           />
           <input
             value={props.manual.caption}
             onChange={(e) => props.onManual({ ...props.manual, caption: e.target.value })}
-            placeholder="accroche / caption"
+            placeholder={c.manualCaption}
           />
           <button type="button" className="cta" disabled={props.busy} onClick={props.onManualAdd}>
-            Enregistrer
+            {c.save}
           </button>
         </div>
       </div>
@@ -895,19 +888,21 @@ function VeillePanel(props: {
           <article className="reel" key={reel.id}>
             <div className="thumb media-thumb">
               {reel.imageUrl ? (
-                <img src={imageProxy(reel.imageUrl)} alt={`Miniature @${reel.handle}`} loading="lazy" />
+                <img src={imageProxy(reel.imageUrl)} alt={c.thumbAlt(reel.handle)} loading="lazy" />
               ) : null}
               <span>{formatViews(reel.views)}</span>
             </div>
             <div>
-              <h4>{reel.caption || 'Reel sans caption'}</h4>
+              <h4>{reel.caption || c.noCaption}</h4>
               <p>
-                @{reel.handle} · baseline {formatViews(reel.baseline)}
+                @{reel.handle} · {c.baseline} {formatViews(reel.baseline)}
               </p>
               <p>{reel.why}</p>
               {tr && (
                 <div className="tr-box">
-                  <strong>Transcription ({tr.source})</strong>
+                  <strong>
+                    {c.transcription} ({tr.source})
+                  </strong>
                   <p>{tr.fullTranscript.slice(0, 220)}</p>
                   <p>
                     <em>A:</em> {tr.captions.punchy}
@@ -924,7 +919,7 @@ function VeillePanel(props: {
                   disabled={props.busy}
                   onClick={() => props.onTranscribe(reel.id)}
                 >
-                  Transcrire + légendes
+                  {c.transcribeCta}
                 </button>
                 <button
                   type="button"
@@ -932,13 +927,13 @@ function VeillePanel(props: {
                   disabled={props.busy}
                   onClick={() => props.onScript(reel.id)}
                 >
-                  Générer le script →
+                  {c.scriptCta}
                 </button>
               </div>
             </div>
             <div className="score">
               <strong>{reel.score.toFixed(1)}×</strong>
-              <span>score viral</span>
+              <span>{c.viralScore}</span>
             </div>
           </article>
         )
@@ -948,29 +943,26 @@ function VeillePanel(props: {
 }
 
 function PhotosPanel(props: {
+  c: AppCopy
   hits: ScoredReel[]
   remakes: Record<string, PhotoRemake>
   busy: boolean
   onRemake: (reelId: string) => void
 }) {
+  const { c } = props
   const [openId, setOpenId] = useState<string | null>(null)
   const [mode, setMode] = useState<Record<string, 'identical' | 'inVoice'>>({})
 
   return (
     <section className="panel">
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Photos & carrousels produit</h3>
-        <p style={{ color: 'var(--muted)', margin: 0 }}>
-          Lookbooks, packing, fit checks. Zack sort ce qui cartonne chez les concurrents, explique
-          pourquoi, puis le refait : à l’identique ou dans la voix de ta marque.
-        </p>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>{c.productTitle}</h3>
+        <p style={{ color: 'var(--muted)', margin: 0 }}>{c.productBody}</p>
       </div>
 
       {props.hits.length === 0 && (
         <div className="card">
-          <p style={{ color: 'var(--muted)', margin: 0 }}>
-            Aucune photo/carrousel exceptionnel pour l’instant. Lance une veille Apify.
-          </p>
+          <p style={{ color: 'var(--muted)', margin: 0 }}>{c.productEmpty}</p>
         </div>
       )}
 
@@ -982,17 +974,17 @@ function PhotosPanel(props: {
           <article className="reel photo" key={post.id}>
             <div className="thumb photo-thumb media-thumb">
               {post.imageUrl ? (
-                <img src={imageProxy(post.imageUrl)} alt={`Publication @${post.handle}`} loading="lazy" />
+                <img src={imageProxy(post.imageUrl)} alt={c.postAlt(post.handle)} loading="lazy" />
               ) : (
                 <b>{post.mediaType === 'carousel' ? '❏' : '▢'}</b>
               )}
               <span>{formatViews(post.views)}</span>
             </div>
             <div style={{ gridColumn: '2 / -1' }}>
-              <h4>{post.caption || 'Publication sans légende'}</h4>
+              <h4>{post.caption || c.noPostCaption}</h4>
               <p>
-                @{post.handle} · {post.mediaType === 'carousel' ? 'carrousel' : 'photo'} · baseline{' '}
-                {formatViews(post.baseline)} likes
+                @{post.handle} · {post.mediaType === 'carousel' ? c.carousel : c.photo} · {c.baseline}{' '}
+                {formatViews(post.baseline)} {c.baselineLikes}
               </p>
               <p>
                 <strong style={{ color: 'var(--blue)' }}>{post.score.toFixed(1)}×</strong> {post.why}
@@ -1009,14 +1001,14 @@ function PhotosPanel(props: {
                     props.onRemake(post.id)
                   }}
                 >
-                  {props.busy && openId === post.id ? 'Zack analyse…' : 'Refaire cette publication'}
+                  {props.busy && openId === post.id ? c.analyzingPost : c.remakeCta}
                 </button>
               )}
 
               {remake && (
                 <div className="remake">
                   <div className="remake-why">
-                    <strong>Pourquoi ça marche</strong>
+                    <strong>{c.whyItWorks}</strong>
                     <p>{remake.why}</p>
                   </div>
                   <div className="seg">
@@ -1025,23 +1017,23 @@ function PhotosPanel(props: {
                       className={`seg-btn${chosen === 'identical' ? ' active' : ''}`}
                       onClick={() => setMode((m) => ({ ...m, [post.id]: 'identical' }))}
                     >
-                      À l’identique
+                      {c.identical}
                     </button>
                     <button
                       type="button"
                       className={`seg-btn${chosen === 'inVoice' ? ' active' : ''}`}
                       onClick={() => setMode((m) => ({ ...m, [post.id]: 'inVoice' }))}
                     >
-                      Dans ma voix
+                      {c.inVoice}
                     </button>
                   </div>
                   {variant && (
                     <div className="remake-body">
-                      <label>Légende</label>
+                      <label>{c.caption}</label>
                       <p className="remake-caption">{variant.caption}</p>
                       {variant.shotList?.length > 0 && (
                         <>
-                          <label>Plan de tournage</label>
+                          <label>{c.shotList}</label>
                           <ul>
                             {variant.shotList.map((s, i) => (
                               <li key={i}>{s}</li>
@@ -1065,11 +1057,13 @@ function PhotosPanel(props: {
 }
 
 function ScriptPanel({
+  c,
   script,
   busy,
   onShorten,
   onRememberRule,
 }: {
+  c: AppCopy
   script: GeneratedScript | null
   busy: boolean
   onShorten: () => void
@@ -1081,10 +1075,8 @@ function ScriptPanel({
     return (
       <section className="panel">
         <div className="card">
-          <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Pas encore de script</h3>
-          <p style={{ color: 'var(--muted)', marginBottom: 0 }}>
-            Depuis Veille, clique « Générer le script » sur une exception.
-          </p>
+          <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>{c.noScriptTitle}</h3>
+          <p style={{ color: 'var(--muted)', marginBottom: 0 }}>{c.noScriptBody}</p>
         </div>
       </section>
     )
@@ -1095,11 +1087,12 @@ function ScriptPanel({
       <article className="script">
         <h3>{script.title}</h3>
         <p className="meta">
-          Généré {new Date(script.createdAt).toLocaleString('fr-FR')} · {script.beats.length} beats
+          {c.generatedOn} {new Date(script.createdAt).toLocaleString(c.locale)} · {script.beats.length}{' '}
+          {c.beats}
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <button type="button" className="cta ghost" disabled={busy} onClick={onShorten}>
-            Raccourcir l’accroche
+            {c.shorten}
           </button>
         </div>
         {script.beats.map((beat) => (
@@ -1108,30 +1101,30 @@ function ScriptPanel({
             <div>
               <strong>{beat.tone}</strong>
               <p>{beat.line}</p>
-              <p>Sous-titre : « {beat.subtitle} »</p>
+              <p>
+                {c.subtitle} : « {beat.subtitle} »
+              </p>
             </div>
           </div>
         ))}
       </article>
       <div className="card feature">
-        <h3>Légendes</h3>
+        <h3>{c.captionsTitle}</h3>
         <p>
-          <strong>A — punchy :</strong> {script.captions.punchy}
+          <strong>{c.punchy} :</strong> {script.captions.punchy}
         </p>
         <p>
-          <strong>B — soft :</strong> {script.captions.soft}
+          <strong>{c.soft} :</strong> {script.captions.soft}
         </p>
       </div>
       <div className="card feature">
-        <h3>Retenir une règle</h3>
-        <p style={{ color: 'var(--muted)' }}>
-          Tu corriges un script ? Zack peut retenir la règle pour tous les suivants.
-        </p>
+        <h3>{c.ruleTitle}</h3>
+        <p style={{ color: 'var(--muted)' }}>{c.ruleBody}</p>
         <div className="chat-input">
           <input
             value={ruleDraft}
             onChange={(e) => setRuleDraft(e.target.value)}
-            placeholder="ex. toujours commencer par une question"
+            placeholder={c.ruleExample}
           />
           <button
             type="button"
@@ -1142,7 +1135,7 @@ function ScriptPanel({
               setRuleDraft('')
             }}
           >
-            Retenir
+            {c.remember}
           </button>
         </div>
       </div>
@@ -1151,11 +1144,13 @@ function ScriptPanel({
 }
 
 function CalendarPanel({
+  c,
   items,
   onAdd,
   onMove,
   onCycleStatus,
 }: {
+  c: AppCopy
   items: CalendarItem[]
   onAdd: (day: number, label: string) => void
   onMove: (id: string, day: number) => void
@@ -1163,13 +1158,13 @@ function CalendarPanel({
 }) {
   const [label, setLabel] = useState('')
   const now = new Date()
-  const year = items.find((c) => c.day > 0)?.year ?? now.getFullYear()
-  const month = items.find((c) => c.day > 0)?.month ?? now.getMonth() + 1
+  const year = items.find((item) => item.day > 0)?.year ?? now.getFullYear()
+  const month = items.find((item) => item.day > 0)?.month ?? now.getMonth() + 1
   const daysInMonth = new Date(year, month, 0).getDate()
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-  const inbox = items.filter((c) => c.day === 0)
+  const inbox = items.filter((item) => item.day === 0)
   const byDay = new Map<number, CalendarItem[]>()
-  for (const item of items.filter((c) => c.month === month && c.day > 0)) {
+  for (const item of items.filter((x) => x.month === month && x.day > 0)) {
     const list = byDay.get(item.day) || []
     list.push(item)
     byDay.set(item.day, list)
@@ -1181,12 +1176,14 @@ function CalendarPanel({
   return (
     <section className="panel calendar">
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Boîte à idées</h3>
-        <p style={{ color: 'var(--muted)', marginTop: 0 }}>
-          Ajoute une idée, puis glisse-la sur un jour. Clique une puce pour cycle écrit → tourné → publié.
-        </p>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>{c.ideasTitle}</h3>
+        <p style={{ color: 'var(--muted)', marginTop: 0 }}>{c.ideasBody}</p>
         <div className="manual-grid" style={{ marginBottom: 12 }}>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="idée / titre" />
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={c.ideaPlaceholder}
+          />
           <button
             type="button"
             className="cta"
@@ -1196,11 +1193,11 @@ function CalendarPanel({
               setLabel('')
             }}
           >
-            Ajouter à la boîte
+            {c.addToInbox}
           </button>
         </div>
         <div className="idea-bank">
-          {inbox.length === 0 && <span style={{ color: 'var(--muted)' }}>Aucune idée en attente</span>}
+          {inbox.length === 0 && <span style={{ color: 'var(--muted)' }}>{c.noIdeas}</span>}
           {inbox.map((item) => (
             <span
               key={item.id}
@@ -1211,7 +1208,7 @@ function CalendarPanel({
                 e.dataTransfer.effectAllowed = 'move'
               }}
               onClick={() => onCycleStatus(item.id, nextStatus(item.status))}
-              title="Glisser sur un jour · clic = changer statut"
+              title={c.dragHint}
             >
               {item.label}
             </span>
@@ -1224,7 +1221,7 @@ function CalendarPanel({
           {String(month).padStart(2, '0')}/{year}
         </h3>
         <div className="weekdays">
-          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
+          {c.weekdays.map((d, i) => (
             <span key={`${d}-${i}`}>{d}</span>
           ))}
         </div>

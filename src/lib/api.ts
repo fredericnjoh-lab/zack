@@ -11,6 +11,7 @@ import type {
   VeilleJob,
   WritingGuide,
 } from '../types'
+import type { Lang } from './i18n'
 
 async function api<T>(path: string, init?: RequestInit & { retries?: number }): Promise<T> {
   const retries = init?.retries ?? 0
@@ -37,7 +38,7 @@ async function api<T>(path: string, init?: RequestInit & { retries?: number }): 
 
 export const zackApi = {
   health: () => api<StatusPayload>('/api/health', { retries: 3 }),
-  veille: () =>
+  veille: (lang: Lang = 'fr') =>
     api<{
       accounts: { handle: string }[]
       hits: ScoredReel[]
@@ -51,7 +52,7 @@ export const zackApi = {
       autoVeille?: AutoVeilleSettings
       discoveries?: DiscoveredAccount[]
       job?: VeilleJob
-    }>('/api/veille', { retries: 3 }),
+    }>(`/api/veille?lang=${lang}`, { retries: 3 }),
   veilleJob: () => api<{ job: VeilleJob }>('/api/veille/job', { retries: 2 }),
   runVeille: () =>
     api<{
@@ -87,10 +88,10 @@ export const zackApi = {
       body: JSON.stringify({ force, async: true }),
       retries: 2,
     }),
-  discover: () =>
+  discover: (lang: Lang = 'fr') =>
     api<{ discoveries: DiscoveredAccount[]; llm: string }>('/api/discover', {
       method: 'POST',
-      body: '{}',
+      body: JSON.stringify({ lang }),
       retries: 1,
     }),
   addAccount: (handle: string) =>
@@ -133,33 +134,34 @@ export const zackApi = {
       body: JSON.stringify(payload),
     }),
   scripts: () => api<{ scripts: GeneratedScript[] }>('/api/scripts', { retries: 2 }),
-  generateScript: (reelId: string) =>
+  generateScript: (reelId: string, lang: Lang = 'fr') =>
     api<{ script: GeneratedScript; openai: boolean }>('/api/scripts/generate', {
       method: 'POST',
-      body: JSON.stringify({ reelId }),
+      body: JSON.stringify({ reelId, lang }),
     }),
-  shortenScript: (id: string) =>
+  shortenScript: (id: string, lang: Lang = 'fr') =>
     api<{ script: GeneratedScript; hook: string }>(`/api/scripts/${encodeURIComponent(id)}/shorten`, {
       method: 'POST',
-      body: '{}',
+      body: JSON.stringify({ lang }),
     }),
   rememberRule: (rule: string) =>
     api<{ writingGuide: WritingGuide; profile: ProfileAnalysis | null }>('/api/writing/rules', {
       method: 'POST',
       body: JSON.stringify({ rule }),
     }),
-  transcribe: (reelId: string) =>
+  transcribe: (reelId: string, lang: Lang = 'fr') =>
     api<{ transcription: Transcription; llm: string }>(
       `/api/reels/${encodeURIComponent(reelId)}/transcribe`,
-      { method: 'POST', body: '{}' },
+      { method: 'POST', body: JSON.stringify({ lang }) },
     ),
   transcriptions: () =>
     api<{ transcriptions: Transcription[] }>('/api/transcriptions', { retries: 2 }),
-  photos: () => api<{ hits: ScoredReel[]; remakes: PhotoRemake[] }>('/api/photos', { retries: 2 }),
-  remakePhoto: (reelId: string) =>
+  photos: (lang: Lang = 'fr') =>
+    api<{ hits: ScoredReel[]; remakes: PhotoRemake[] }>(`/api/photos?lang=${lang}`, { retries: 2 }),
+  remakePhoto: (reelId: string, lang: Lang = 'fr') =>
     api<{ remake: PhotoRemake; llm: string }>('/api/photos/remake', {
       method: 'POST',
-      body: JSON.stringify({ reelId }),
+      body: JSON.stringify({ reelId, lang }),
     }),
   profile: () =>
     api<{ profile: ProfileAnalysis | null; writingGuide?: WritingGuide }>('/api/profile', {
@@ -180,7 +182,7 @@ export const zackApi = {
     api<{ writingGuide: WritingGuide }>(`/api/writing/documents/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
-  chat: (message: string) =>
+  chat: (message: string, lang: Lang = 'fr') =>
     api<{
       reply: string
       actions?: string[]
@@ -191,7 +193,7 @@ export const zackApi = {
       job?: VeilleJob
     }>('/api/chat', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, lang }),
       retries: 1,
     }),
 }
