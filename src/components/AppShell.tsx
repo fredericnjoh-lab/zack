@@ -37,7 +37,7 @@ export function AppShell({ onBack }: AppShellProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       from: 'zack',
-      text: 'Salut — je peux lancer une veille, montrer le top, raccourcir une accroche, découvrir des comptes, transcrire un Reel. Qu’est-ce qu’on fait ?',
+      text: 'Salut — ajoute tes marques concurrentes, lance une veille, ou colle un Reel drop/fit. Qu’est-ce qu’on fait ?',
     },
   ])
   const [draft, setDraft] = useState('')
@@ -539,11 +539,11 @@ function ProfilePanel(props: {
     <section className="panel">
       <div className="card profile-hero">
         <div>
-          <span className="eyebrow">Ton ADN de marque</span>
-          <h3>Apprends à Zack comment tu communiques</h3>
+          <span className="eyebrow">ADN de marque</span>
+          <h3>Apprends à Zack la voix de ta marque</h3>
           <p>
-            Zack analyse tes publications, ta voix, tes piliers — et apprend aussi de tes documents
-            et des règles que tu retiens.
+            Zack analyse tes publications, ton ton streetwear / DTC, tes piliers — et apprend aussi
+            de ton brand book et des règles que tu retiens.
           </p>
         </div>
         <div className="chat-input">
@@ -749,12 +749,12 @@ function VeillePanel(props: {
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Tes concurrents</h3>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Tes marques concurrentes</h3>
         <div className="chat-input" style={{ marginBottom: 10 }}>
           <input
             value={props.handleInput}
             onChange={(e) => props.onHandleInput(e.target.value)}
-            placeholder="@compte_instagram"
+            placeholder="@marque_instagram"
             aria-label="Ajouter un compte"
           />
           <button type="button" className="cta" disabled={props.busy} onClick={props.onAddAccount}>
@@ -779,7 +779,7 @@ function VeillePanel(props: {
             {props.busy ? 'Veille…' : props.apify ? 'Lancer la veille Apify' : 'Recalculer la veille'}
           </button>
           <button type="button" className="cta ghost" disabled={props.busy} onClick={props.onDiscover}>
-            Découvrir des comptes
+            Découvrir des marques
           </button>
         </div>
         {props.notice && (
@@ -823,7 +823,7 @@ function VeillePanel(props: {
 
       {props.discoveries.length > 0 && (
         <div className="card">
-          <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Découverte de comptes</h3>
+          <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Découverte de marques</h3>
           {props.discoveries.map((d) => (
             <div className="discovery-row" key={d.handle}>
               <div>
@@ -950,10 +950,10 @@ function PhotosPanel(props: {
   return (
     <section className="panel">
       <div className="card">
-        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Photos & carrousels</h3>
+        <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Photos & carrousels produit</h3>
         <p style={{ color: 'var(--muted)', margin: 0 }}>
-          Pas que les Reels. Zack sort le meilleur des publications photo, t’explique pourquoi ça a
-          marché, puis le refait : à l’identique ou réécrit dans ta voix.
+          Lookbooks, packing, fit checks. Zack sort ce qui cartonne chez les concurrents, explique
+          pourquoi, puis le refait : à l’identique ou dans la voix de ta marque.
         </p>
       </div>
 

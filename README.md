@@ -1,6 +1,8 @@
 # Zack
 
-Veille Instagram → score viral → scripts → photos/carrousels → calendrier.
+Veille Instagram **pour marques de vêtements** — score viral concurrent → script drop/fit → calendrier.
+
+Streetwear · DTC · ready-to-wear. Moteur : Apify (scrape) + score relatif + Claude (OCR / scripts / remakes).
 
 ## Local
 

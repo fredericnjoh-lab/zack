@@ -7,6 +7,11 @@ import type {
   ScoredReel,
   Transcription,
 } from './types.ts'
+import {
+  FASHION_DISCOVERY_SEEDS,
+  FASHION_SYSTEM,
+  fashionAngleHint,
+} from './fashion.ts'
 
 export type LlmProvider = 'claude' | 'openai' | 'local'
 
@@ -71,8 +76,12 @@ export async function transcribeReel(reel: ScoredReel): Promise<Transcription> {
     }
   }
 
-  const prompt = `Tu es Zack. À partir d'un Reel Instagram concurrent, produis une transcription utile pour refaire le contenu.
-Compte: @${reel.handle}
+  const angle = fashionAngleHint(reel.caption)
+  const prompt = `${FASHION_SYSTEM}
+
+À partir d'un Reel MARQUE concurrente, produis une transcription utile pour refaire le contenu (drop / fit / packing / lookbook).
+Marque: @${reel.handle}
+Angle détecté: ${angle}
 Caption: ${reel.caption || '(vide)'}
 Texte lu à l'écran (OCR): ${ocrFromVision || '(aucun — déduis depuis la caption)'}
 Score viral: ${reel.score.toFixed(1)}×
@@ -80,9 +89,9 @@ Score viral: ${reel.score.toFixed(1)}×
 Réponds UNIQUEMENT en JSON:
 {
   "ocrText": "texte affiché à l'écran (ou vide)",
-  "spokenGuess": "voix-off / paroles reconstituées seconde par seconde en FR",
-  "fullTranscript": "transcription complète prête à travailler",
-  "captions": {"punchy":"légende A prête à coller","soft":"légende B plus douce"}
+  "spokenGuess": "voix-off / paroles reconstituées seconde par seconde en FR, ton marque",
+  "fullTranscript": "transcription complète prête à tourner",
+  "captions": {"punchy":"légende A drop/fit prête à coller","soft":"légende B plus soft brand"}
 }`
 
   try {
@@ -123,11 +132,13 @@ export async function discoverAccounts(
     return localDiscoveries(watched)
   }
 
-  const prompt = `Tu es Zack, expert Instagram FR. L'utilisateur suit déjà: ${watched.map((h) => `@${h}`).join(', ') || '(aucun)'}.
-Niche / contexte: ${nicheHint || 'créateurs Instagram'}
-Suggère 6 comptes Instagram RÉELS et publics de la même niche qu'il ne suit probablement pas encore.
+  const prompt = `${FASHION_SYSTEM}
+
+L'utilisateur gère une MARQUE DE VÊTEMENTS. Il suit déjà: ${watched.map((h) => `@${h}`).join(', ') || '(aucun)'}.
+Contexte / ADN: ${nicheHint || 'streetwear / mode DTC'}
+Suggère 6 comptes Instagram RÉELS et publics — UNIQUEMENT des marques de vêtements / sneakers / streetwear (pas des influenceurs perso), du même segment prix/style, qu'il ne suit probablement pas encore.
 Réponds UNIQUEMENT en JSON:
-{"accounts":[{"handle":"sans @","reason":"pourquoi le surveiller","nicheFit":"angle niche","estimatedFollowers":"ex 120k"}]}`
+{"accounts":[{"handle":"sans @","reason":"pourquoi cette marque concurrente","nicheFit":"segment (ex streetwear UK premium)","estimatedFollowers":"ex 120k"}]}`
 
   try {
     const content = provider === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
@@ -140,8 +151,8 @@ Réponds UNIQUEMENT en JSON:
           .replace(/^@/, '')
           .trim()
           .toLowerCase(),
-        reason: String(a.reason || 'Créateur proche de ta niche'),
-        nicheFit: String(a.nicheFit || 'niche'),
+        reason: String(a.reason || 'Marque proche de ton segment'),
+        nicheFit: String(a.nicheFit || 'mode / streetwear'),
         estimatedFollowers: a.estimatedFollowers ? String(a.estimatedFollowers) : undefined,
         verified: false,
         suggestedAt: now,
@@ -272,16 +283,14 @@ function localTranscription(reel: ScoredReel): Transcription {
 }
 
 function localDiscoveries(watched: string[]): DiscoveredAccount[] {
-  const seeds = ['creatrice.style', 'atelier.quotidien', 'studio.lumiere.fr', 'mode.minute', 'coulisses.marque', 'reel.lab']
   const blocked = new Set(watched.map((h) => h.toLowerCase()))
   const now = new Date().toISOString()
-  return seeds
-    .filter((h) => !blocked.has(h))
-    .slice(0, 4)
+  return FASHION_DISCOVERY_SEEDS.filter((h) => !blocked.has(h))
+    .slice(0, 6)
     .map((handle) => ({
       handle,
-      reason: 'Suggestion locale (ajoute ANTHROPIC_API_KEY pour des comptes réels de ta niche).',
-      nicheFit: 'proche de ta veille',
+      reason: 'Marque du même univers (streetwear / mode). Ajoute ANTHROPIC_API_KEY pour des suggestions calibrées à ton ADN.',
+      nicheFit: 'marques de vêtements',
       verified: false,
       suggestedAt: now,
     }))
@@ -319,32 +328,35 @@ export async function generatePhotoRemake(
   if (provider === 'local') return fallback
 
   const kind = reel.mediaType === 'carousel' ? 'carrousel' : 'photo'
+  const angle = fashionAngleHint(reel.caption)
   const voice = profile
-    ? `\nPROFIL UTILISATEUR @${profile.handle}: ${profile.voice}\nRègles: ${profile.rules.join('; ')}\nPiliers: ${profile.pillars.join('; ')}`
+    ? `\nMARQUE UTILISATEUR @${profile.handle}: ${profile.voice}\nRègles: ${profile.rules.join('; ')}\nPiliers: ${profile.pillars.join('; ')}`
     : ''
-  const prompt = `Tu es Zack, expert contenu Instagram francophone.
-Analyse cette publication ${kind} qui a sur-performé chez un concurrent, puis produis deux remakes.
-Compte: @${reel.handle}
+  const prompt = `${FASHION_SYSTEM}
+
+Analyse cette publication ${kind} qui a sur-performé chez une marque concurrente, puis produis deux remakes PRODUIT / COLLECTION.
+Marque: @${reel.handle}
 Type: ${kind}
+Angle détecté: ${angle}
 Likes: ${reel.views} (score ${reel.score.toFixed(1)}× la médiane ${kind} du compte)
 Légende d'origine: ${reel.caption || '(vide)'}
 ${voice}
 
 Réponds UNIQUEMENT en JSON valide (pas de markdown):
 {
-  "why": "2-3 phrases: pourquoi CETTE publication a marché (angle, hook visuel, émotion, structure du carrousel).",
+  "why": "2-3 phrases: pourquoi CETTE publi a marché (hook produit, styling, structure carrousel, émotion marque).",
   "identical": {
-    "caption": "reprise fidèle de l'angle, adaptée FR, prête à publier",
-    "hashtags": ["#..."],
-    "shotList": ["plan/slide 1: ...", "plan/slide 2: ..."]
+    "caption": "reprise fidèle de l'angle, adaptée FR, prête à publier pour une marque",
+    "hashtags": ["#streetwear","#..."],
+    "shotList": ["slide/plan 1: produit...", "slide/plan 2: ..."]
   },
   "inVoice": {
-    "caption": "même concept mais réécrit dans une voix perso, plus authentique",
+    "caption": "même concept réécrit dans la voix de LA marque utilisateur",
     "hashtags": ["#..."],
-    "shotList": ["plan/slide 1: ...", "plan/slide 2: ..."]
+    "shotList": ["slide/plan 1: ...", "slide/plan 2: ..."]
   }
 }
-3 à 5 éléments de shotList par version.`
+3 à 5 éléments de shotList par version — parlons packing, fit, fabric, drop, pas lifestyle générique.`
 
   try {
     const content = provider === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
@@ -380,11 +392,11 @@ export async function analyzeProfile(handle: string, posts: Reel[]): Promise<Pro
     handle,
     analyzedAt: new Date().toISOString(),
     postsAnalyzed: posts.length,
-    voice: 'Directe, visuelle et centrée sur le produit.',
-    pillars: ['Produit', 'Coulisses', 'Communauté'],
-    strengths: ['Identité cohérente', 'Formats visuels réguliers'],
-    opportunities: ['Hooks plus explicites', 'Davantage de storytelling'],
-    rules: ['Phrases courtes', 'Un angle par publication', 'CTA naturel en fin de légende'],
+    voice: 'Voix de marque directe, visuelle, centrée produit et attitude.',
+    pillars: ['Produit / drop', 'Fit & styling', 'Communauté / UGC'],
+    strengths: ['Identité visuelle cohérente', 'Formats produit réguliers'],
+    opportunities: ['Hooks drop plus clairs', 'Plus de behind the stitch'],
+    rules: ['Phrases courtes', 'Un angle par post (drop OU fit OU packing)', 'CTA shop naturel'],
     topFormats,
     posts,
   }
@@ -394,11 +406,15 @@ export async function analyzeProfile(handle: string, posts: Reel[]): Promise<Pro
     type: p.mediaType || 'reel',
     performance: p.views,
     caption: (p.caption || '').slice(0, 500),
+    angle: fashionAngleHint(p.caption),
   }))
-  const prompt = `Analyse le profil Instagram @${handle} pour que Zack apprenne sa voix.
+  const prompt = `${FASHION_SYSTEM}
+
+Analyse le profil Instagram @${handle} — c'est une MARQUE DE VÊTEMENTS (ou aspire à en être une).
+Apprends sa voix de marque pour scripts drop / fit / lookbook.
 Posts: ${JSON.stringify(samples)}
 Réponds uniquement en JSON:
-{"voice":"description précise","pillars":["..."],"strengths":["..."],"opportunities":["..."],"rules":["règles d'écriture concrètes"]}
+{"voice":"description précise de la voix de marque","pillars":["..."],"strengths":["..."],"opportunities":["..."],"rules":["règles d'écriture concrètes pour la marque"]}
 3 à 5 éléments par liste.`
   const content = llmProvider() === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
   const parsed = parseProfileJson(content)
@@ -447,28 +463,29 @@ function parseRemakeJson(content: string): Partial<Omit<PhotoRemake, 'id' | 'sou
 
 function localRemake(reel: ScoredReel): PhotoRemake {
   const kind = reel.mediaType === 'carousel' ? 'carrousel' : 'photo'
+  const angle = fashionAngleHint(reel.caption)
   const base = (reel.caption || '').slice(0, 120)
   return {
     id: `remake-${Date.now()}`,
     sourceReelId: reel.id,
     handle: reel.handle,
-    why: `Cette ${kind} fait ${reel.score.toFixed(1)}× les likes habituels de @${reel.handle} : angle fort + visuel qui arrête le scroll. On garde la structure, pas les mots.`,
+    why: `Cette ${kind} (${angle}) fait ${reel.score.toFixed(1)}× les likes habituels de @${reel.handle} : hook produit + framing qui arrête le scroll. On garde la structure, pas les mots.`,
     identical: {
-      caption: base ? `Repris de l'angle qui a marché : ${base}` : `Même angle que la ${kind} qui a cartonné.`,
-      hashtags: ['#inspo', '#contenu', '#instagram'],
+      caption: base ? `Même angle ${angle} : ${base}` : `Même structure ${angle} que la ${kind} qui a cartonné.`,
+      hashtags: ['#streetwear', '#fitcheck', '#newdrop'],
       shotList: [
-        `Slide 1 : le hook visuel identique (${kind})`,
-        'Slide 2 : la preuve / le détail',
-        'Slide 3 : le CTA',
+        `Slide 1 : hook produit (${angle})`,
+        'Slide 2 : détail matière / fit',
+        'Slide 3 : CTA shop / link in bio',
       ],
     },
     inVoice: {
-      caption: 'Même idée, mais racontée à ma façon — plus perso, plus vrai.',
-      hashtags: ['#mavoix', '#behindthescenes'],
+      caption: 'Même idée drop, racontée dans notre voix de marque — pas une copie.',
+      hashtags: ['#brandvoice', '#behindthestitch'],
       shotList: [
-        'Slide 1 : mon hook perso',
-        'Slide 2 : mon expérience/preuve',
-        'Slide 3 : mon CTA',
+        'Slide 1 : notre hook marque',
+        'Slide 2 : notre preuve / fit',
+        'Slide 3 : notre CTA',
       ],
     },
     createdAt: new Date().toISOString(),
@@ -480,16 +497,19 @@ function buildPrompt(
   profile?: ProfileAnalysis,
   extras?: { writingContext?: string; transcription?: Transcription },
 ): string {
+  const angle = fashionAngleHint(reel.caption)
   const voice = extras?.writingContext
-    ? `\nMÉTHODE D'ÉCRITURE:\n${extras.writingContext}`
+    ? `\nVOIX / MÉTHODE DE MARQUE:\n${extras.writingContext}`
     : profile
-      ? `\nPROFIL UTILISATEUR @${profile.handle}: ${profile.voice}\nRègles: ${profile.rules.join('; ')}\nPiliers: ${profile.pillars.join('; ')}`
+      ? `\nMARQUE @${profile.handle}: ${profile.voice}\nRègles: ${profile.rules.join('; ')}\nPiliers: ${profile.pillars.join('; ')}`
       : ''
   const transcript = extras?.transcription
     ? `\nTranscription / OCR du Reel:\nOCR: ${extras.transcription.ocrText}\nParlé: ${extras.transcription.spokenGuess}\nComplet: ${extras.transcription.fullTranscript}`
     : ''
-  return `Tu es Zack, coach Reels Instagram francophone.
-À partir de ce Reel concurrent, écris un script ORIGINAL dans la voix de l'utilisateur (pas une copie).
+  return `${FASHION_SYSTEM}
+
+À partir de ce Reel d'une marque concurrente, écris un script ORIGINAL dans la voix de LA marque utilisateur (pas une copie).
+Angle détecté: ${angle} — structure le script autour de cet angle mode (drop, fit check, packing, etc.).
 Reel @${reel.handle} — ${reel.views} vues — score viral ${reel.score.toFixed(1)}× (baseline ${Math.round(reel.baseline)}).
 Caption: ${reel.caption || '(vide)'}
 ${transcript}
@@ -500,7 +520,7 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown):
   "beats": [{"time":"0:00","tone":"...","line":"...","subtitle":"..."}],
   "captions": {"punchy":"...","soft":"..."}
 }
-4 à 6 beats, total ~15-25s.`
+4 à 6 beats, total ~15-25s. CTA shop / link in bio OK en fin.`
 }
 
 async function callClaude(prompt: string): Promise<string> {
@@ -518,7 +538,7 @@ async function callClaude(prompt: string): Promise<string> {
       model,
       max_tokens: 1200,
       temperature: 0.7,
-      system: 'Tu réponds uniquement en JSON valide, sans backticks markdown.',
+      system: FASHION_SYSTEM + '\nTu réponds uniquement en JSON valide, sans backticks markdown.',
       messages: [{ role: 'user', content: prompt }],
     }),
   })
@@ -593,7 +613,8 @@ function localScript(
   title: string,
   transcription?: Transcription,
 ): GeneratedScript {
-  const hook = transcription?.spokenGuess?.split(/[.!?]/)[0] || reel.caption || 'Hook concurrent'
+  const angle = fashionAngleHint(reel.caption)
+  const hook = transcription?.spokenGuess?.split(/[.!?]/)[0] || reel.caption || 'Nouveau drop'
   return {
     id: `script-${Date.now()}`,
     title,
@@ -601,36 +622,36 @@ function localScript(
     createdAt: new Date().toISOString(),
     transcriptionId: transcription?.id,
     captions: transcription?.captions || {
-      punchy: `Le vrai signal : ${reel.score.toFixed(1)}× la baseline — pas les vues brutes.`,
-      soft: `J’ai regardé @${reel.handle} : ${Math.round(reel.views / 1000)}k vues vs ~${Math.round(reel.baseline / 1000)}k habituels. Voici mon take.`,
+      punchy: `${angle.replace(/_/g, ' ')} · ${reel.score.toFixed(1)}× la baseline de @${reel.handle}. On le refait à notre façon.`,
+      soft: `Chez @${reel.handle}, ce format ${angle} a fait ${formatViews(reel.views)} vs ~${formatViews(reel.baseline)} d’habitude. Voici notre take marque.`,
     },
     beats: [
       {
         time: '0:00',
-        tone: 'Direct, regard caméra',
+        tone: 'Hook produit, regard caméra',
         line: String(hook).slice(0, 140),
-        subtitle: 'Accroche',
+        subtitle: `Accroche ${angle}`,
       },
       {
         time: '0:05',
-        tone: 'Expliquer',
-        line: `Zack calcule le score viral : ici ${reel.score.toFixed(1)}× la médiane du compte (${formatViews(reel.views)} vs ${formatViews(reel.baseline)}).`,
+        tone: 'Preuve',
+        line: `Signal : ${reel.score.toFixed(1)}× la médiane de la marque (${formatViews(reel.views)} vs ${formatViews(reel.baseline)}).`,
         subtitle: `Score ${reel.score.toFixed(1)}×`,
       },
       {
         time: '0:10',
-        tone: 'Preuve',
+        tone: 'Fit / détail',
         line: transcription?.ocrText
-          ? `Texte à l’écran lu : « ${transcription.ocrText.slice(0, 90)} ». On reprend la structure, pas les mots.`
+          ? `Texte écran : « ${transcription.ocrText.slice(0, 90)} ». On garde la structure ${angle}, pas les mots.`
           : reel.caption
-            ? `L’angle qui a marché : « ${reel.caption.slice(0, 90)} ». On le refait dans ta voix.`
-            : 'On reprend la structure (hook → preuve → CTA), pas les mots.',
+            ? `Angle concurrent : « ${reel.caption.slice(0, 90)} ». On le refait dans notre voix de marque.`
+            : `Structure ${angle} : hook → preuve produit → CTA shop.`,
         subtitle: 'Structure, pas copie',
       },
       {
         time: '0:16',
         tone: 'CTA',
-        line: 'Tu veux le script complet ? Dis à Zack « raccourcis mon accroche ».',
+        line: 'Link in bio. Drop live. No apologies.',
         subtitle: 'Prêt à filmer',
       },
     ],
