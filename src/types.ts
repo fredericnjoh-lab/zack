@@ -92,6 +92,17 @@ export type WritingGuide = {
   learnedRules: string[]
 }
 
+export type VeilleJob = {
+  status: 'idle' | 'running' | 'ok' | 'error'
+  startedAt?: string
+  finishedAt?: string
+  mode?: string
+  fetched?: number
+  hits?: number
+  error?: string
+  summary?: string
+}
+
 export type AutoVeilleSettings = {
   enabled: boolean
   hour: number

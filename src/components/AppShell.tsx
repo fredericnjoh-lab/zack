@@ -9,6 +9,7 @@ import type {
   ProfileAnalysis,
   ScoredReel,
   Transcription,
+  VeilleJob,
   WritingGuide,
 } from '../types'
 
@@ -66,11 +67,14 @@ export function AppShell({ onBack }: AppShellProps) {
   const [transcriptions, setTranscriptions] = useState<Record<string, Transcription>>({})
   const [profileHandle, setProfileHandle] = useState('')
   const [busy, setBusy] = useState(false)
+  const [waking, setWaking] = useState(false)
+  const [job, setJob] = useState<VeilleJob>({ status: 'idle' })
   const [error, setError] = useState('')
   const [handleInput, setHandleInput] = useState('')
   const [manual, setManual] = useState({ handle: '', views: '', caption: '', baseline: '' })
 
   async function refresh() {
+    setWaking(true)
     try {
       const [v, c, s, p, own, tr] = await Promise.all([
         zackApi.veille(),
@@ -90,6 +94,7 @@ export function AppShell({ onBack }: AppShellProps) {
         notice: '',
       })
       if (v.autoVeille) setAutoVeille(v.autoVeille)
+      if (v.job) setJob(v.job)
       setDiscoveries(v.discoveries || [])
       setCalendar(c.items)
       if (s.scripts[0]) setScript(s.scripts[0])
@@ -107,13 +112,69 @@ export function AppShell({ onBack }: AppShellProps) {
       )
       setError('')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'API indisponible — lance npm run dev')
+      setError(
+        e instanceof Error
+          ? `${e.message} — le serveur Render se réveille (30–60 s), réessai auto…`
+          : 'API indisponible — réveil Render en cours…',
+      )
+      // One more delayed retry after cold start
+      setTimeout(() => {
+        void refreshQuiet()
+      }, 8000)
+    } finally {
+      setWaking(false)
+    }
+  }
+
+  async function refreshQuiet() {
+    try {
+      const v = await zackApi.veille()
+      setHits(v.hits)
+      setAccounts(v.accounts)
+      if (v.autoVeille) setAutoVeille(v.autoVeille)
+      if (v.job) setJob(v.job)
+      setDiscoveries(v.discoveries || [])
+      setStatus((s) => ({
+        ...s,
+        apify: v.apify,
+        openai: v.openai,
+        llm: v.llm || s.llm,
+        mode: v.lastVeilleMode || s.mode,
+      }))
+      setError('')
+    } catch {
+      /* keep previous error */
     }
   }
 
   useEffect(() => {
     void refresh()
   }, [])
+
+  // Poll while a background veille is running
+  useEffect(() => {
+    if (job.status !== 'running') return
+    const id = setInterval(() => {
+      void (async () => {
+        try {
+          const { job: next } = await zackApi.veilleJob()
+          setJob(next)
+          if (next.status === 'ok') {
+            await refreshQuiet()
+            setStatus((s) => ({ ...s, notice: next.summary || 'Veille terminée.' }))
+            setBusy(false)
+          }
+          if (next.status === 'error') {
+            setError(next.error || 'Veille échouée')
+            setBusy(false)
+          }
+        } catch {
+          /* ignore transient */
+        }
+      })()
+    }, 2500)
+    return () => clearInterval(id)
+  }, [job.status])
 
   async function send() {
     const text = draft.trim()
@@ -156,6 +217,7 @@ export function AppShell({ onBack }: AppShellProps) {
             {status.apify ? ' · Apify ON' : ' · mode local'}
             {status.openai ? (status.llm === 'claude' ? ' · Claude ON' : ' · LLM ON') : ''}
             {autoVeille.enabled ? ` · auto ${autoVeille.hour}h` : ''}
+            {job.status === 'running' ? ' · veille en cours…' : ''}
           </p>
         </div>
         <button type="button" className="cta ghost" onClick={onBack}>
@@ -163,10 +225,26 @@ export function AppShell({ onBack }: AppShellProps) {
         </button>
       </div>
 
-      {error && (
-        <div className="card" style={{ borderColor: '#fca5a5', marginBottom: 12 }}>
-          <strong>API</strong>
-          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>{error}</p>
+      {(error || waking) && (
+        <div className="card" style={{ borderColor: error ? '#fca5a5' : 'var(--line)', marginBottom: 12 }}>
+          <strong>{waking && !error ? 'Connexion' : 'API'}</strong>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>
+            {error || 'Réveil du serveur Render…'}
+          </p>
+          {error && (
+            <button type="button" className="cta ghost" style={{ marginTop: 8 }} onClick={() => void refresh()}>
+              Réessayer
+            </button>
+          )}
+        </div>
+      )}
+
+      {job.status === 'running' && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <strong>Veille en cours</strong>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>
+            Apify scrape tes comptes (1–3 min). La page se met à jour automatiquement.
+          </p>
         </div>
       )}
 
@@ -268,13 +346,15 @@ export function AppShell({ onBack }: AppShellProps) {
           }}
           onRun={async () => {
             setBusy(true)
+            setError('')
             try {
               const r = await zackApi.runVeille()
+              if (r.job) setJob(r.job)
               setHits(r.hits)
               setStatus((s) => ({ ...s, mode: r.mode, notice: r.notice || '' }))
+              if (r.job?.status !== 'running') setBusy(false)
             } catch (e) {
               setError(e instanceof Error ? e.message : 'veille failed')
-            } finally {
               setBusy(false)
             }
           }}
@@ -710,7 +790,8 @@ function VeillePanel(props: {
       <div className="card">
         <h3 style={{ marginTop: 0, fontFamily: 'var(--font-display)' }}>Veille automatique</h3>
         <p style={{ color: 'var(--muted)', marginTop: 0 }}>
-          Zack passe tes concurrents à l’heure choisie (Europe/Paris). Ton palmarès est prêt sans clic.
+          Active ici + le cron GitHub (chaque matin ~7h Paris). Zack réveille Render et lance la
+          veille tout seul — plus besoin de cliquer.
         </p>
         <div className="manual-grid auto-veille-row">
           <label className="toggle-row">

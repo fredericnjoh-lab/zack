@@ -1,0 +1,54 @@
+name: Zack daily auto-veille
+
+# Wakes the Render free tier and launches the morning scrape.
+# Schedule is UTC — 05:00 UTC ≈ 07:00 Europe/Paris (06:00 in winter).
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  auto-veille:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake Render + start async veille
+        env:
+          ZACK_URL: ${{ secrets.ZACK_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          BASE="${ZACK_URL:-https://zack-n0zd.onrender.com}"
+          BASE="${BASE%/}"
+          echo "Pinging $BASE …"
+          # Cold start can take up to ~60s on free tier
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 30 "$BASE/api/health" >/tmp/zack-health.json; then
+              echo "Health OK"
+              cat /tmp/zack-health.json
+              break
+            fi
+            echo "Wake attempt $i failed — retrying…"
+            sleep 10
+          done
+          HDR=(-H "content-type: application/json")
+          if [ -n "${CRON_SECRET:-}" ]; then
+            HDR+=(-H "x-cron-secret: ${CRON_SECRET}")
+          fi
+          curl -fsS --max-time 60 -X POST "$BASE/api/cron/veille" "${HDR[@]}" -d '{}' | tee /tmp/zack-cron.json
+          echo
+          # Poll until job finishes (Apify often 1–3 min)
+          for i in $(seq 1 40); do
+            sleep 8
+            curl -fsS --max-time 30 "$BASE/api/veille/job" >/tmp/zack-job.json || continue
+            STATUS=$(python3 -c "import json; print(json.load(open('/tmp/zack-job.json'))['job']['status'])")
+            echo "job status=$STATUS"
+            if [ "$STATUS" = "ok" ] || [ "$STATUS" = "error" ] || [ "$STATUS" = "idle" ]; then
+              cat /tmp/zack-job.json
+              if [ "$STATUS" = "error" ]; then exit 1; fi
+              exit 0
+            fi
+          done
+          echo "Timed out waiting for veille job"
+          cat /tmp/zack-job.json || true
+          exit 1

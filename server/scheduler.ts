@@ -1,6 +1,5 @@
-import { fetchReelsForHandles, hasApify } from './apify.ts'
-import { loadStore, saveStore } from './db.ts'
-import { scoreReels } from './scoring.ts'
+import { loadStore } from './db.ts'
+import { getVeilleJob, startVeilleJob } from './jobs.ts'
 
 /** Current hour in Europe/Paris (0–23). */
 export function parisHour(now = new Date()): number {
@@ -50,50 +49,38 @@ export async function maybeRunAutoVeille(force = false): Promise<AutoVeilleResul
     return { ran: false, reason: 'aucun compte suivi' }
   }
 
-  try {
-    if (hasApify()) {
-      const fetched = await fetchReelsForHandles(store.accounts.map((a) => a.handle))
-      const other = store.reels.filter((r) => !store.accounts.some((a) => a.handle === r.handle))
-      store.reels = [...other, ...fetched]
-      store.lastVeilleMode = 'apify'
-    } else {
-      store.lastVeilleMode = store.reels.some((r) => r.source === 'manual') ? 'manual' : 'seed'
-    }
-    store.lastVeilleAt = new Date().toISOString()
-    const hits = scoreReels(store.reels)
-    const top = hits.slice(0, 5)
-    const summary =
-      top.length === 0
-        ? 'Palmarès du jour : aucune exception ≥ 2,5×.'
-        : `Palmarès du jour : ${top
-            .map((h) => `@${h.handle} ${h.score.toFixed(1)}×`)
-            .join(' · ')}`
-
-    store.autoVeille = {
-      ...settings,
-      enabled: settings.enabled || force,
-      hour: settings.hour,
-      lastRunAt: store.lastVeilleAt,
-      lastPalmaresSummary: summary,
-    }
-    saveStore(store)
-    return { ran: true, reason: 'ok', hits: hits.length, summary }
-  } catch (err) {
-    return {
-      ran: false,
-      reason: err instanceof Error ? err.message : 'échec auto-veille',
-    }
+  const job = getVeilleJob()
+  if (job.status === 'running') {
+    return { ran: false, reason: 'veille déjà en cours' }
   }
+
+  const { started } = startVeilleJob({ source: force ? 'cron' : 'scheduler' })
+  if (!started) {
+    const again = getVeilleJob()
+    return { ran: false, reason: again.error || 'non démarrée' }
+  }
+
+  const deadline = Date.now() + 90_000
+  while (getVeilleJob().status === 'running' && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2000))
+  }
+  const done = getVeilleJob()
+  if (done.status === 'ok') {
+    return { ran: true, reason: 'ok', hits: done.hits, summary: done.summary }
+  }
+  if (done.status === 'running') {
+    return { ran: true, reason: 'started_async', summary: 'Veille encore en cours…' }
+  }
+  return { ran: false, reason: done.error || 'échec auto-veille' }
 }
 
-/** Poll every minute; safe no-op when not due. */
+/** Poll every minute while awake (Render free sleeps — GitHub cron is the reliable path). */
 export function startAutoVeilleLoop() {
   const tick = () => {
     void maybeRunAutoVeille(false).then((r) => {
-      if (r.ran) console.log(`[auto-veille] ${r.summary}`)
+      if (r.ran) console.log(`[auto-veille] ${r.summary || r.reason}`)
     })
   }
-  // First check shortly after boot, then every minute.
   setTimeout(tick, 15_000)
   setInterval(tick, 60_000)
 }

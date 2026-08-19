@@ -17,11 +17,24 @@ App + API : http://127.0.0.1:8787
 
 - Score viral (médiane compte × type de média)
 - Transcription + OCR frame (Claude Vision) + 2 légendes
-- Veille automatique à l’heure choisie (Europe/Paris)
+- Veille automatique via **GitHub Actions** (réveille Render free + scrape)
 - Découverte de comptes de niche
 - Méthode d’écriture : documents + règles retenues
 - Chat agentique (« lance une veille », « raccourcis mon accroche », …)
 - Agenda drag & drop (boîte à idées → jours) + statuts écrit/tourné/publié
+
+## Veille auto (obligatoire sur Render free)
+
+Le plan free Render **s’endort** : le timer interne ne suffit pas. Utilise le workflow
+`.github/workflows/auto-veille.yml` :
+
+1. Repo GitHub → **Settings → Secrets and variables → Actions**
+2. Ajoute `ZACK_URL` = `https://zack-n0zd.onrender.com` (ou ton URL)
+3. Optionnel : `CRON_SECRET` (même valeur côté Render env)
+4. Dans Zack → Veille → **Activer** la veille automatique
+5. Test : Actions → **Zack daily auto-veille** → Run workflow
+
+Chaque matin ~7h Paris, GitHub réveille le serveur et lance `POST /api/cron/veille`.
 
 ## Deploy Render (URL stable)
 
@@ -38,4 +51,5 @@ Ou manuellement : **New Web Service** → Build `npm install --include=dev && np
 
 - Les données (`data/store.json`) sont locales au disque du service (éphémère sur le plan free) : une veille Apify re-remplit tout.
 - Compte Instagram **privé** = non lisible par Apify.
-- Sur le free tier Render, le process dort : active un **Cron Job** Render qui appelle `POST /api/auto-veille/run` avec `{"force":true}` si tu veux un palmarès fiable chaque matin.
+- Sur le free tier Render, le process dort : le workflow GitHub **Zack daily auto-veille** appelle `POST /api/cron/veille` chaque matin.
+- Les veilles Apify partent en **async** (plus de timeout proxy « API failed »).

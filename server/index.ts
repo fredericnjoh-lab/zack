@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { fetchReelsForHandles, hasApify } from './apify.ts'
 import { loadStore, normalizeHandle, saveStore, writingContext } from './db.ts'
+import { getVeilleJob, startVeilleJob } from './jobs.ts'
 import {
   analyzeProfile,
   discoverAccounts,
@@ -98,47 +99,60 @@ app.get('/api/veille', (_req, res) => {
     claude: llmProvider() === 'claude',
     autoVeille: store.autoVeille || { enabled: false, hour: 7 },
     discoveries: store.discoveries || [],
+    job: getVeilleJob(),
   })
 })
 
-app.post('/api/veille/run', async (_req, res) => {
+app.get('/api/veille/job', (_req, res) => {
+  res.json({ job: getVeilleJob() })
+})
+
+app.post('/api/veille/run', (req, res) => {
   const store = loadStore()
   if (store.accounts.length === 0) {
     return res.status(400).json({ error: 'ajoute au moins 1 compte' })
   }
+  const { started, job } = startVeilleJob({ source: 'ui' })
+  res.json({
+    async: true,
+    started,
+    job,
+    mode: job.mode || 'pending',
+    fetched: job.fetched || 0,
+    hits: scoreReels(store.reels),
+    notice: started
+      ? 'Veille lancée en arrière-plan (1–3 min). La page se met à jour toute seule.'
+      : job.status === 'running'
+        ? 'Une veille est déjà en cours…'
+        : job.error || 'Veille non démarrée',
+  })
+})
 
-  try {
-    if (hasApify()) {
-      const fetched = await fetchReelsForHandles(store.accounts.map((a) => a.handle))
-      const other = store.reels.filter((r) => !store.accounts.some((a) => a.handle === r.handle))
-      store.reels = [...other, ...fetched]
-      store.lastVeilleMode = 'apify'
-      store.lastVeilleAt = new Date().toISOString()
-      saveStore(store)
-      return res.json({
-        mode: 'apify',
-        fetched: fetched.length,
-        hits: scoreReels(store.reels),
-      })
+/** External cron (GitHub Actions / cron-job.org) — wakes Render and runs veille. */
+app.post('/api/cron/veille', (req, res) => {
+  const secret = process.env.CRON_SECRET
+  if (secret) {
+    const header = req.get('x-cron-secret') || ''
+    const bodySecret = typeof req.body?.secret === 'string' ? req.body.secret : ''
+    if (header !== secret && bodySecret !== secret) {
+      return res.status(401).json({ error: 'cron secret invalide' })
     }
-
-    store.lastVeilleMode = store.reels.some((r) => r.source === 'manual') ? 'manual' : 'seed'
-    store.lastVeilleAt = new Date().toISOString()
-    saveStore(store)
-    res.json({
-      mode: store.lastVeilleMode,
-      fetched: store.reels.length,
-      hits: scoreReels(store.reels),
-      notice:
-        'Pas de APIFY_TOKEN — veille sur données locales/manuelles. Ajoute le token pour scraper Instagram.',
-    })
-  } catch (err) {
-    res.status(502).json({ error: err instanceof Error ? err.message : 'veille failed' })
   }
+  const store = loadStore()
+  if (!store.autoVeille) store.autoVeille = { enabled: true, hour: 7 }
+  store.autoVeille.enabled = true
+  saveStore(store)
+  const { started, job } = startVeilleJob({ source: 'cron' })
+  res.json({
+    ok: true,
+    started,
+    job,
+    message: 'Veille auto démarrée (async). Le serveur reste réveillé le temps du scrape.',
+  })
 })
 
 app.get('/api/auto-veille', (_req, res) => {
-  res.json({ autoVeille: loadStore().autoVeille || { enabled: false, hour: 7 } })
+  res.json({ autoVeille: loadStore().autoVeille || { enabled: false, hour: 7 }, job: getVeilleJob() })
 })
 
 app.post('/api/auto-veille', (req, res) => {
@@ -162,12 +176,22 @@ app.post('/api/auto-veille', (req, res) => {
 
 app.post('/api/auto-veille/run', async (req, res) => {
   const force = Boolean((req.body as { force?: boolean })?.force)
+  const asyncMode = (req.body as { async?: boolean })?.async !== false
+  if (asyncMode && force) {
+    const store = loadStore()
+    if (!store.autoVeille) store.autoVeille = { enabled: true, hour: 7 }
+    store.autoVeille.enabled = true
+    saveStore(store)
+    const { started, job } = startVeilleJob({ source: 'cron' })
+    return res.json({ ran: started, reason: started ? 'started' : job.status, job, async: true })
+  }
   const result = await maybeRunAutoVeille(force)
   const store = loadStore()
   res.json({
     ...result,
     autoVeille: store.autoVeille,
     hits: scoreReels(store.reels).slice(0, 10),
+    job: getVeilleJob(),
   })
 })
 
@@ -525,26 +549,16 @@ app.post('/api/chat', async (req, res) => {
           actions,
         })
       }
-      if (hasApify()) {
-        const fetched = await fetchReelsForHandles(store.accounts.map((a) => a.handle))
-        const other = store.reels.filter((r) => !store.accounts.some((a) => a.handle === r.handle))
-        store.reels = [...other, ...fetched]
-        store.lastVeilleMode = 'apify'
-      } else {
-        store.lastVeilleMode = 'seed'
-      }
-      store.lastVeilleAt = new Date().toISOString()
-      saveStore(store)
-      const nextHits = scoreReels(store.reels)
+      const { started, job } = startVeilleJob({ source: 'chat' })
       actions.push('veille_run')
       return res.json({
-        reply: `Veille lancée (${store.lastVeilleMode}). ${nextHits.length} exceptions ≥ 2,5×. Top : ${
-          nextHits[0]
-            ? `@${nextHits[0].handle} ${nextHits[0].score.toFixed(1)}×`
-            : 'aucune pour l’instant'
-        }.`,
+        reply: started
+          ? `Veille lancée en arrière-plan sur ${store.accounts.length} comptes. Reviens dans 1–3 min — ou reste sur Veille, ça se rafraîchit tout seul.`
+          : job.status === 'running'
+            ? 'Une veille tourne déjà. Patience, je te préviens quand c’est bon.'
+            : `Impossible de lancer : ${job.error || 'erreur'}`,
         actions,
-        hits: nextHits.slice(0, 8),
+        job,
       })
     }
 
