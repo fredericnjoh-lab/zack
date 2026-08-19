@@ -1,4 +1,12 @@
-import type { GeneratedScript, PhotoRemake, ProfileAnalysis, Reel, ScoredReel } from './types.ts'
+import type {
+  DiscoveredAccount,
+  GeneratedScript,
+  PhotoRemake,
+  ProfileAnalysis,
+  Reel,
+  ScoredReel,
+  Transcription,
+} from './types.ts'
 
 export type LlmProvider = 'claude' | 'openai' | 'local'
 
@@ -20,20 +28,21 @@ export function hasOpenAI(): boolean {
 export async function generateScriptFromReel(
   reel: ScoredReel,
   profile?: ProfileAnalysis,
+  extras?: { writingContext?: string; transcription?: Transcription },
 ): Promise<GeneratedScript> {
   const title = (reel.caption || 'Script Zack').split('\n')[0]!.slice(0, 80)
   const provider = llmProvider()
 
   if (provider === 'local') {
-    return localScript(reel, title)
+    return localScript(reel, title, extras?.transcription)
   }
 
-  const prompt = buildPrompt(reel, profile)
+  const prompt = buildPrompt(reel, profile, extras)
   const content =
     provider === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
 
   const parsed = parseScriptJson(content)
-  const fallback = localScript(reel, title)
+  const fallback = localScript(reel, title, extras?.transcription)
 
   return {
     id: `script-${Date.now()}`,
@@ -42,6 +51,261 @@ export async function generateScriptFromReel(
     beats: parsed.beats?.length ? parsed.beats : fallback.beats,
     captions: parsed.captions || fallback.captions,
     createdAt: new Date().toISOString(),
+    transcriptionId: extras?.transcription?.id,
+  }
+}
+
+/** OCR frame + reconstruction transcription + 2 légendes. */
+export async function transcribeReel(reel: ScoredReel): Promise<Transcription> {
+  const provider = llmProvider()
+  const fallback = localTranscription(reel)
+
+  if (provider === 'local') return fallback
+
+  let ocrFromVision = ''
+  if (reel.imageUrl && provider === 'claude') {
+    try {
+      ocrFromVision = await ocrFrameWithClaude(reel.imageUrl)
+    } catch {
+      ocrFromVision = ''
+    }
+  }
+
+  const prompt = `Tu es Zack. À partir d'un Reel Instagram concurrent, produis une transcription utile pour refaire le contenu.
+Compte: @${reel.handle}
+Caption: ${reel.caption || '(vide)'}
+Texte lu à l'écran (OCR): ${ocrFromVision || '(aucun — déduis depuis la caption)'}
+Score viral: ${reel.score.toFixed(1)}×
+
+Réponds UNIQUEMENT en JSON:
+{
+  "ocrText": "texte affiché à l'écran (ou vide)",
+  "spokenGuess": "voix-off / paroles reconstituées seconde par seconde en FR",
+  "fullTranscript": "transcription complète prête à travailler",
+  "captions": {"punchy":"légende A prête à coller","soft":"légende B plus douce"}
+}`
+
+  try {
+    const content = provider === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
+    const parsed = parseTranscriptionJson(content)
+    return {
+      id: `tr-${Date.now()}`,
+      reelId: reel.id,
+      handle: reel.handle,
+      ocrText: parsed.ocrText || ocrFromVision || fallback.ocrText,
+      spokenGuess: parsed.spokenGuess || fallback.spokenGuess,
+      fullTranscript: parsed.fullTranscript || fallback.fullTranscript,
+      captions: parsed.captions || fallback.captions,
+      source: ocrFromVision ? 'vision' : 'caption',
+      createdAt: new Date().toISOString(),
+    }
+  } catch {
+    return {
+      ...fallback,
+      ocrText: ocrFromVision || fallback.ocrText,
+      source: ocrFromVision ? 'vision' : 'local',
+    }
+  }
+}
+
+export async function discoverAccounts(
+  watched: string[],
+  profile?: ProfileAnalysis,
+  writingContext = '',
+): Promise<DiscoveredAccount[]> {
+  const provider = llmProvider()
+  const nicheHint =
+    profile?.pillars?.join(', ') ||
+    writingContext.slice(0, 400) ||
+    watched.slice(0, 5).join(', ')
+
+  if (provider === 'local') {
+    return localDiscoveries(watched)
+  }
+
+  const prompt = `Tu es Zack, expert Instagram FR. L'utilisateur suit déjà: ${watched.map((h) => `@${h}`).join(', ') || '(aucun)'}.
+Niche / contexte: ${nicheHint || 'créateurs Instagram'}
+Suggère 6 comptes Instagram RÉELS et publics de la même niche qu'il ne suit probablement pas encore.
+Réponds UNIQUEMENT en JSON:
+{"accounts":[{"handle":"sans @","reason":"pourquoi le surveiller","nicheFit":"angle niche","estimatedFollowers":"ex 120k"}]}`
+
+  try {
+    const content = provider === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
+    const parsed = parseDiscoverJson(content)
+    const blocked = new Set(watched.map((h) => h.toLowerCase()))
+    const now = new Date().toISOString()
+    return (parsed.accounts || [])
+      .map((a) => ({
+        handle: String(a.handle || '')
+          .replace(/^@/, '')
+          .trim()
+          .toLowerCase(),
+        reason: String(a.reason || 'Créateur proche de ta niche'),
+        nicheFit: String(a.nicheFit || 'niche'),
+        estimatedFollowers: a.estimatedFollowers ? String(a.estimatedFollowers) : undefined,
+        verified: false,
+        suggestedAt: now,
+      }))
+      .filter((a) => a.handle && !blocked.has(a.handle))
+      .slice(0, 6)
+  } catch {
+    return localDiscoveries(watched)
+  }
+}
+
+export async function shortenHook(
+  script: GeneratedScript,
+  writingContext = '',
+): Promise<{ hook: string; beats: GeneratedScript['beats'] }> {
+  const first = script.beats[0]
+  const provider = llmProvider()
+  if (provider === 'local') {
+    const hook = (first?.line || script.title).split(/[.!?]/)[0]!.slice(0, 90)
+    const beats = script.beats.map((b, i) =>
+      i === 0 ? { ...b, line: hook, subtitle: hook.slice(0, 40) } : b,
+    )
+    return { hook, beats }
+  }
+
+  const prompt = `Raccourcis l'accroche de ce script Reel. Garde le punch, max 12 mots.
+Titre: ${script.title}
+Accroche actuelle: ${first?.line || ''}
+${writingContext ? `Contexte écriture:\n${writingContext.slice(0, 800)}` : ''}
+
+Réponds UNIQUEMENT en JSON:
+{"hook":"...","tone":"...","subtitle":"..."}`
+
+  const content = provider === 'claude' ? await callClaude(prompt) : await callOpenAI(prompt)
+  const cleaned = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim()
+  let parsed: { hook?: string; tone?: string; subtitle?: string } = {}
+  try {
+    parsed = JSON.parse(cleaned.match(/\{[\s\S]*\}/)?.[0] || cleaned) as typeof parsed
+  } catch {
+    parsed = {}
+  }
+  const hook = parsed.hook || (first?.line || script.title).slice(0, 80)
+  const beats = script.beats.map((b, i) =>
+    i === 0
+      ? {
+          ...b,
+          line: hook,
+          tone: parsed.tone || b.tone,
+          subtitle: parsed.subtitle || hook.slice(0, 42),
+        }
+      : b,
+  )
+  return { hook, beats }
+}
+
+async function ocrFrameWithClaude(imageUrl: string): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || ''
+  const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5'
+  const upstream = await fetch(imageUrl, { headers: { 'user-agent': 'Mozilla/5.0' } })
+  if (!upstream.ok) throw new Error('image fetch failed')
+  const buf = Buffer.from(await upstream.arrayBuffer())
+  if (buf.byteLength > 4_500_000) throw new Error('image too large')
+  const contentType = upstream.headers.get('content-type') || 'image/jpeg'
+  const mediaType = contentType.includes('png')
+    ? 'image/png'
+    : contentType.includes('webp')
+      ? 'image/webp'
+      : contentType.includes('gif')
+        ? 'image/gif'
+        : 'image/jpeg'
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 600,
+      temperature: 0,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mediaType,
+                data: buf.toString('base64'),
+              },
+            },
+            {
+              type: 'text',
+              text: 'Lis tout le texte visible à l’écran (OCR). Réponds uniquement avec le texte lu, ligne par ligne. Si aucun texte: (vide).',
+            },
+          ],
+        },
+      ],
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Claude vision failed: ${res.status} ${body}`)
+  }
+  const data = (await res.json()) as { content?: { type: string; text?: string }[] }
+  return (data.content?.find((c) => c.type === 'text')?.text || '').trim()
+}
+
+function localTranscription(reel: ScoredReel): Transcription {
+  const caption = reel.caption || 'Hook concurrent'
+  return {
+    id: `tr-${Date.now()}`,
+    reelId: reel.id,
+    handle: reel.handle,
+    ocrText: caption,
+    spokenGuess: `VO: ${caption}. Preuve. CTA.`,
+    fullTranscript: `[0:00] ${caption}\n[0:05] Preuve / détail\n[0:12] CTA`,
+    captions: {
+      punchy: `${caption} — voici mon take.`,
+      soft: `J’ai vu ça chez @${reel.handle} (${reel.score.toFixed(1)}×). Mon angle :`,
+    },
+    source: 'local',
+    createdAt: new Date().toISOString(),
+  }
+}
+
+function localDiscoveries(watched: string[]): DiscoveredAccount[] {
+  const seeds = ['creatrice.style', 'atelier.quotidien', 'studio.lumiere.fr', 'mode.minute', 'coulisses.marque', 'reel.lab']
+  const blocked = new Set(watched.map((h) => h.toLowerCase()))
+  const now = new Date().toISOString()
+  return seeds
+    .filter((h) => !blocked.has(h))
+    .slice(0, 4)
+    .map((handle) => ({
+      handle,
+      reason: 'Suggestion locale (ajoute ANTHROPIC_API_KEY pour des comptes réels de ta niche).',
+      nicheFit: 'proche de ta veille',
+      verified: false,
+      suggestedAt: now,
+    }))
+}
+
+function parseTranscriptionJson(content: string): Partial<Transcription> {
+  const cleaned = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim()
+  try {
+    return JSON.parse(cleaned.match(/\{[\s\S]*\}/)?.[0] || cleaned) as Partial<Transcription>
+  } catch {
+    return {}
+  }
+}
+
+function parseDiscoverJson(content: string): {
+  accounts?: { handle?: string; reason?: string; nicheFit?: string; estimatedFollowers?: string }[]
+} {
+  const cleaned = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim()
+  try {
+    return JSON.parse(cleaned.match(/\{[\s\S]*\}/)?.[0] || cleaned) as {
+      accounts?: { handle?: string; reason?: string; nicheFit?: string; estimatedFollowers?: string }[]
+    }
+  } catch {
+    return {}
   }
 }
 
@@ -211,14 +475,24 @@ function localRemake(reel: ScoredReel): PhotoRemake {
   }
 }
 
-function buildPrompt(reel: ScoredReel, profile?: ProfileAnalysis): string {
-  const voice = profile
-    ? `\nPROFIL UTILISATEUR @${profile.handle}: ${profile.voice}\nRègles: ${profile.rules.join('; ')}\nPiliers: ${profile.pillars.join('; ')}`
+function buildPrompt(
+  reel: ScoredReel,
+  profile?: ProfileAnalysis,
+  extras?: { writingContext?: string; transcription?: Transcription },
+): string {
+  const voice = extras?.writingContext
+    ? `\nMÉTHODE D'ÉCRITURE:\n${extras.writingContext}`
+    : profile
+      ? `\nPROFIL UTILISATEUR @${profile.handle}: ${profile.voice}\nRègles: ${profile.rules.join('; ')}\nPiliers: ${profile.pillars.join('; ')}`
+      : ''
+  const transcript = extras?.transcription
+    ? `\nTranscription / OCR du Reel:\nOCR: ${extras.transcription.ocrText}\nParlé: ${extras.transcription.spokenGuess}\nComplet: ${extras.transcription.fullTranscript}`
     : ''
   return `Tu es Zack, coach Reels Instagram francophone.
 À partir de ce Reel concurrent, écris un script ORIGINAL dans la voix de l'utilisateur (pas une copie).
 Reel @${reel.handle} — ${reel.views} vues — score viral ${reel.score.toFixed(1)}× (baseline ${Math.round(reel.baseline)}).
 Caption: ${reel.caption || '(vide)'}
+${transcript}
 ${voice}
 
 Réponds UNIQUEMENT en JSON valide (pas de markdown):
@@ -314,13 +588,19 @@ function parseScriptJson(content: string): {
   }
 }
 
-function localScript(reel: ScoredReel, title: string): GeneratedScript {
+function localScript(
+  reel: ScoredReel,
+  title: string,
+  transcription?: Transcription,
+): GeneratedScript {
+  const hook = transcription?.spokenGuess?.split(/[.!?]/)[0] || reel.caption || 'Hook concurrent'
   return {
     id: `script-${Date.now()}`,
     title,
     sourceReelId: reel.id,
     createdAt: new Date().toISOString(),
-    captions: {
+    transcriptionId: transcription?.id,
+    captions: transcription?.captions || {
       punchy: `Le vrai signal : ${reel.score.toFixed(1)}× la baseline — pas les vues brutes.`,
       soft: `J’ai regardé @${reel.handle} : ${Math.round(reel.views / 1000)}k vues vs ~${Math.round(reel.baseline / 1000)}k habituels. Voici mon take.`,
     },
@@ -328,27 +608,29 @@ function localScript(reel: ScoredReel, title: string): GeneratedScript {
       {
         time: '0:00',
         tone: 'Direct, regard caméra',
-        line: `Si ton Reel fait ${formatViews(reel.views)} alors que le compte tourne autour de ${formatViews(reel.baseline)}… c’est un signal.`,
-        subtitle: 'Pas les vues brutes. Le multiple.',
+        line: String(hook).slice(0, 140),
+        subtitle: 'Accroche',
       },
       {
         time: '0:05',
         tone: 'Expliquer',
-        line: `Zack calcule le score viral : ici ${reel.score.toFixed(1)}× la médiane du compte.`,
+        line: `Zack calcule le score viral : ici ${reel.score.toFixed(1)}× la médiane du compte (${formatViews(reel.views)} vs ${formatViews(reel.baseline)}).`,
         subtitle: `Score ${reel.score.toFixed(1)}×`,
       },
       {
         time: '0:10',
         tone: 'Preuve',
-        line: reel.caption
-          ? `L’angle qui a marché : « ${reel.caption.slice(0, 90)} ». On le refait dans ta voix, pas en copiant.`
-          : 'On reprend la structure (hook → preuve → CTA), pas les mots.',
+        line: transcription?.ocrText
+          ? `Texte à l’écran lu : « ${transcription.ocrText.slice(0, 90)} ». On reprend la structure, pas les mots.`
+          : reel.caption
+            ? `L’angle qui a marché : « ${reel.caption.slice(0, 90)} ». On le refait dans ta voix.`
+            : 'On reprend la structure (hook → preuve → CTA), pas les mots.',
         subtitle: 'Structure, pas copie',
       },
       {
         time: '0:16',
         tone: 'CTA',
-        line: 'Tu veux le script complet découpé seconde par seconde ? Dis à Zack « raccourcis mon accroche ».',
+        line: 'Tu veux le script complet ? Dis à Zack « raccourcis mon accroche ».',
         subtitle: 'Prêt à filmer',
       },
     ],

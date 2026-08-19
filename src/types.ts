@@ -65,6 +65,48 @@ export type GeneratedScript = {
   beats: ScriptBeat[]
   captions: { punchy: string; soft: string }
   createdAt: string
+  transcriptionId?: string
+}
+
+export type Transcription = {
+  id: string
+  reelId: string
+  handle: string
+  ocrText: string
+  spokenGuess: string
+  fullTranscript: string
+  captions: { punchy: string; soft: string }
+  source: 'vision' | 'caption' | 'local'
+  createdAt: string
+}
+
+export type WritingDocument = {
+  id: string
+  name: string
+  content: string
+  addedAt: string
+}
+
+export type WritingGuide = {
+  documents: WritingDocument[]
+  learnedRules: string[]
+}
+
+export type AutoVeilleSettings = {
+  enabled: boolean
+  hour: number
+  lastRunAt?: string
+  lastPalmaresSummary?: string
+}
+
+export type DiscoveredAccount = {
+  handle: string
+  reason: string
+  nicheFit: string
+  estimatedFollowers?: string
+  sampleViews?: number
+  verified: boolean
+  suggestedAt: string
 }
 
 export type StatusPayload = {

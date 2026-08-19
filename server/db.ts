@@ -169,7 +169,29 @@ export function loadStore(): Store {
   ensure()
   const store = JSON.parse(readFileSync(storePath, 'utf8')) as Store
   if (!store.remakes) store.remakes = []
+  if (!store.transcriptions) store.transcriptions = []
+  if (!store.discoveries) store.discoveries = []
+  if (!store.writingGuide) store.writingGuide = { documents: [], learnedRules: [] }
+  if (!store.autoVeille) store.autoVeille = { enabled: false, hour: 7 }
   return store
+}
+
+/** Profile rules + règles apprises + extraits docs → contexte d’écriture. */
+export function writingContext(store: Store): string {
+  const guide = store.writingGuide || { documents: [], learnedRules: [] }
+  const parts: string[] = []
+  if (store.profile) {
+    parts.push(`PROFIL @${store.profile.handle}: ${store.profile.voice}`)
+    if (store.profile.rules.length) parts.push(`Règles profil: ${store.profile.rules.join('; ')}`)
+    if (store.profile.pillars.length) parts.push(`Piliers: ${store.profile.pillars.join('; ')}`)
+  }
+  if (guide.learnedRules.length) {
+    parts.push(`Règles retenues: ${guide.learnedRules.join('; ')}`)
+  }
+  for (const doc of guide.documents.slice(0, 5)) {
+    parts.push(`Doc « ${doc.name} »: ${doc.content.slice(0, 1200)}`)
+  }
+  return parts.join('\n')
 }
 
 export function saveStore(store: Store) {
