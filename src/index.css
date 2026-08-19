@@ -1,24 +1,26 @@
 :root {
-  --bg: #060608;
-  --bg-soft: rgba(255, 255, 255, 0.03);
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-strong: rgba(255, 255, 255, 0.075);
-  --ink: #f2efe9;
-  --muted: rgba(242, 239, 233, 0.56);
-  --line: rgba(255, 255, 255, 0.12);
-  --line-strong: rgba(255, 255, 255, 0.22);
+  --bg: #0b0b10;
+  --bg-soft: rgba(255, 255, 255, 0.035);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-strong: rgba(255, 255, 255, 0.085);
+  --ink: #f4f1ea;
+  --muted: rgba(244, 241, 234, 0.6);
+  --line: rgba(255, 255, 255, 0.13);
+  --line-strong: rgba(255, 255, 255, 0.24);
 
-  --accent: #f2efe9;
-  --accent-2: #f2efe9;
-  --accent-3: #f2efe9;
-  --accent-soft: rgba(242, 239, 233, 0.1);
-  --accent-wash: rgba(242, 239, 233, 0.06);
+  /* Signal palette: one hot accent, two status supports */
+  --accent: #ff4d1c;
+  --accent-2: #7cf2c0;
+  --accent-3: #ffc247;
+  --accent-soft: rgba(255, 77, 28, 0.16);
+  --accent-wash: rgba(255, 77, 28, 0.08);
+  --accent-line: rgba(255, 77, 28, 0.45);
   --grad: linear-gradient(180deg, #ffffff 0%, #d9d5cd 100%);
 
-  --blue: #f2efe9;
-  --blue-deep: rgba(242, 239, 233, 0.8);
-  --blue-soft: rgba(242, 239, 233, 0.14);
-  --blue-wash: rgba(242, 239, 233, 0.07);
+  --blue: #ff7a4d;
+  --blue-deep: rgba(255, 77, 28, 0.85);
+  --blue-soft: rgba(255, 77, 28, 0.18);
+  --blue-wash: rgba(255, 77, 28, 0.09);
 
   --shadow: none;
   --shadow-glow: none;
@@ -67,6 +69,18 @@ body::before {
   background-size: 88px 88px;
 }
 
+/* Warm bloom so the page never reads as flat black */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(70vw 55vh at 8% -10%, rgba(255, 77, 28, 0.16), transparent 62%),
+    radial-gradient(55vw 45vh at 100% 108%, rgba(124, 242, 192, 0.09), transparent 60%);
+}
+
 button,
 input,
 textarea {
@@ -106,7 +120,7 @@ img {
 
 /* Hide aurora when clinical landing is up */
 .app-root.app-landing {
-  background: #060608;
+  background: var(--bg);
 }
 
 .page {
@@ -1279,8 +1293,9 @@ button.pill:hover {
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(180deg, rgba(6, 6, 8, 0.35) 0%, rgba(6, 6, 8, 0.2) 40%, rgba(6, 6, 8, 0.92) 100%),
-    linear-gradient(90deg, rgba(6, 6, 8, 0.55) 0%, transparent 55%);
+    radial-gradient(80vw 60vh at 12% 100%, rgba(255, 77, 28, 0.28), transparent 58%),
+    linear-gradient(180deg, rgba(8, 8, 12, 0.3) 0%, rgba(8, 8, 12, 0.18) 40%, rgba(11, 11, 16, 0.92) 100%),
+    linear-gradient(90deg, rgba(11, 11, 16, 0.55) 0%, transparent 55%);
 }
 
 .landing-hero-copy {
@@ -1399,6 +1414,11 @@ button.pill:hover {
   gap: 18px;
   padding: 28px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  transition: border-color 0.3s ease;
+}
+
+.landing-flow li:hover {
+  border-bottom-color: var(--accent-line);
 }
 
 .landing-n {
@@ -1624,6 +1644,31 @@ select {
   box-shadow: none !important;
 }
 
+/* Primary actions carry the accent; ghosts stay quiet */
+.cta:not(.ghost) {
+  background: var(--accent) !important;
+  color: #140602 !important;
+}
+
+.cta:not(.ghost):hover {
+  background: #ff6337 !important;
+}
+
+.tab.active {
+  background: var(--accent) !important;
+  color: #140602 !important;
+}
+
+.seg-btn.active {
+  background: var(--accent) !important;
+  color: #140602 !important;
+}
+
+.bubble.user {
+  background: var(--accent) !important;
+  color: #140602 !important;
+}
+
 .cta.ghost {
   background: transparent !important;
   color: var(--ink) !important;
@@ -1631,7 +1676,8 @@ select {
 }
 
 .cta.ghost:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: var(--accent-wash) !important;
+  border-color: var(--accent-line);
 }
 
 .cta:hover {
@@ -1640,8 +1686,8 @@ select {
 
 .profile-hero,
 .remake-why {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border-left: 2px solid var(--ink);
+  background: linear-gradient(120deg, var(--accent-wash), rgba(255, 255, 255, 0.03)) !important;
+  border-left: 2px solid var(--accent);
 }
 
 .feature svg,
@@ -1655,9 +1701,6 @@ select {
 
 .section-title,
 .metric strong,
-.score strong,
-.beat time,
-.proof-item strong,
 .remake-body label,
 .hero h1 {
   background: none !important;
@@ -1665,33 +1708,54 @@ select {
   color: var(--ink) !important;
 }
 
+/* Data points that deserve the eye */
+.score strong,
+.beat time,
+.proof-item strong,
+.landing-n,
+.eyebrow,
+.landing-kicker,
+.landing-stack-row dt {
+  background: none !important;
+  -webkit-text-fill-color: var(--accent);
+  color: var(--accent) !important;
+}
+
 .chat-input input:focus,
 .manual-grid input:focus,
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--line-strong) !important;
+  border-color: var(--accent-line) !important;
   box-shadow: none !important;
-  outline: 1px solid rgba(242, 239, 233, 0.35);
+  outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 
 button.pill:hover {
-  border-color: var(--line-strong) !important;
-  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--accent-line) !important;
+  background: var(--accent-wash) !important;
 }
 
-/* Status stays readable without candy colors */
+/* Status chips read at a glance without turning candy */
 .chip {
   background: rgba(255, 255, 255, 0.06) !important;
   color: var(--ink) !important;
-  border-left: 2px solid rgba(242, 239, 233, 0.35);
+  border-left: 2px solid rgba(244, 241, 234, 0.35);
 }
 
-.chip.tourne { border-left-color: rgba(242, 239, 233, 0.65); }
+.chip.ecrit {
+  border-left-color: rgba(244, 241, 234, 0.4);
+}
+
+.chip.tourne {
+  border-left-color: var(--accent-2);
+  background: rgba(124, 242, 192, 0.12) !important;
+}
+
 .chip.publie {
-  border-left-color: var(--ink);
-  background: rgba(255, 255, 255, 0.12) !important;
+  border-left-color: var(--accent);
+  background: var(--accent-soft) !important;
 }
 
 .shell-top h1,
