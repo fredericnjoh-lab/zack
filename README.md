@@ -4,6 +4,19 @@ Veille Instagram **pour marques de vêtements** — score viral concurrent → s
 
 Streetwear · DTC · ready-to-wear. Moteur : Apify (scrape) + score relatif + Claude (OCR / scripts / remakes).
 
+## Les trois outils `tools/`
+
+En plus de Zack, ce repo contient trois petits logiciels autonomes — un par méthode du post
+`content/post-claude-code-non-developpeurs.md` :
+
+| Outil | Ce qu'il fait | Lancer |
+|---|---|---|
+| **Agence** | Une idée → post LinkedIn + script reel + légende Instagram, dans ta voix | `npm run tool:agence` |
+| **Leads** | Ta cible en français → prospects Google Maps qualifiés → CSV | `npm run tool:leads` |
+| **Générateur** | Ta douleur → un vrai outil sur mesure, écrit sur ton disque | `npm run tool:builder` |
+
+Détails, clés et déploiement : [`tools/README.md`](tools/README.md).
+
 ## Local
 
 ```bash

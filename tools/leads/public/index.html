@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Leads — ta cible en français, tes prospects au réveil</title>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #131720; --panel-2: #1a1f2b; --line: #262d3b;
+    --text: #e8ecf4; --muted: #8b95a8; --accent: #ff5c39; --ok: #3ddc97; --warn: #f5c451;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  input, textarea { width: 100%; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font: inherit; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+    padding: 11px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); font-weight: 400; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+  a { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .05em; padding: 0 10px 10px; }
+  td { padding: 12px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+  .score { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .s-hi { color: var(--ok); } .s-mid { color: var(--warn); } .s-lo { color: var(--muted); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .err { border-color: #7a2d2d; color: #ffb3a7; }
+  .hide { display: none; }
+  .scroll { overflow-x: auto; }
+  .nom { font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Leads</h1>
+  <p class="sub">Tu décris ta cible en français. Le robot Google Maps l'extrait, Claude la qualifie, tu exportes vers ton CRM.</p>
+
+  <div id="status" class="card hide"></div>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label for="metier">Métier cible</label>
+        <input id="metier" placeholder="Ex : architecte d'intérieur" />
+      </div>
+      <div>
+        <label for="ville">Ville / zone</label>
+        <input id="ville" placeholder="Ex : Lyon" />
+      </div>
+      <div>
+        <label for="limit">Combien de fiches</label>
+        <input id="limit" type="number" value="50" min="1" max="500" />
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <label for="offre">Ton offre (c'est elle qui sert à noter la pertinence)</label>
+      <textarea id="offre" rows="2" placeholder="Ex : je crée des sites vitrines à 1500 € livrés en 10 jours pour les indépendants du bâtiment"></textarea>
+    </div>
+    <div class="row">
+      <button id="go">Lancer l'extraction</button>
+      <a id="csv" class="muted" href="/api/leads.csv">Exporter en CSV</a>
+      <button id="clear" class="ghost">Vider la liste</button>
+    </div>
+  </div>
+
+  <div id="job" class="card hide"></div>
+  <div id="table"></div>
+</div>
+
+<script type="module">
+const $ = (s) => document.querySelector(s)
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+let polling = null
+
+function status(msg, isErr) {
+  const el = $('#status')
+  if (!msg) { el.classList.add('hide'); return }
+  el.className = 'card' + (isErr ? ' err' : '')
+  el.textContent = msg
+}
+
+async function api(path, options) {
+  const res = await fetch(path, {
+    method: options?.method || 'GET',
+    headers: { 'content-type': 'application/json' },
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `erreur ${res.status}`)
+  return data
+}
+
+function scoreClass(s) {
+  if (s == null) return 's-lo'
+  return s >= 70 ? 's-hi' : s >= 45 ? 's-mid' : 's-lo'
+}
+
+async function loadLeads() {
+  const { leads } = await api('/api/leads')
+  if (!leads.length) {
+    $('#table').innerHTML = '<div class="card muted">Aucun prospect pour l\'instant. Lance une extraction au-dessus.</div>'
+    return
+  }
+  const rows = leads.map((l) => `<tr>
+    <td class="score ${scoreClass(l.score)}">${l.score ?? '—'}</td>
+    <td>
+      <div class="nom">${esc(l.nom)}</div>
+      <div class="muted">${esc(l.categorie || '')}${l.ville ? ' · ' + esc(l.ville) : ''}</div>
+      ${l.raison ? `<div class="muted" style="margin-top:6px">${esc(l.raison)}</div>` : ''}
+    </td>
+    <td>
+      ${l.telephone ? `<div>${esc(l.telephone)}</div>` : ''}
+      ${l.email ? `<div>${esc(l.email)}</div>` : ''}
+      ${l.site ? `<div><a href="${esc(l.site)}" target="_blank" rel="noreferrer noopener">site</a></div>` : '<div class="muted">pas de site</div>'}
+    </td>
+    <td class="muted">${l.note ? `${l.note}/5 · ${l.avis ?? 0} avis` : '—'}</td>
+    <td>${esc(l.accroche || '')}</td>
+  </tr>`).join('')
+
+  $('#table').innerHTML = `<div class="card scroll">
+    <div class="muted" style="margin-bottom:12px">${leads.length} prospects · triés par pertinence</div>
+    <table>
+      <thead><tr><th>Score</th><th>Entreprise</th><th>Contact</th><th>Réputation</th><th>Accroche</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`
+}
+
+function showJob(job) {
+  const el = $('#job')
+  if (job.status === 'idle') { el.classList.add('hide'); return }
+  el.className = 'card' + (job.status === 'error' ? ' err' : '')
+  el.textContent = job.status === 'error' ? job.error : job.etape || 'En cours…'
+}
+
+async function poll() {
+  const { job } = await api('/api/job')
+  showJob(job)
+  if (job.status !== 'running') {
+    clearInterval(polling)
+    polling = null
+    $('#go').disabled = false
+    $('#go').textContent = "Lancer l'extraction"
+    await loadLeads()
+  }
+}
+
+$('#go').onclick = async () => {
+  status('')
+  $('#go').disabled = true
+  $('#go').textContent = 'Extraction…'
+  try {
+    await api('/api/scrape', {
+      method: 'POST',
+      body: {
+        metier: $('#metier').value,
+        ville: $('#ville').value,
+        limit: Number($('#limit').value),
+        offre: $('#offre').value,
+      },
+    })
+    if (polling) clearInterval(polling)
+    polling = setInterval(() => poll().catch(() => {}), 3000)
+    poll()
+  } catch (err) {
+    status(err.message, true)
+    $('#go').disabled = false
+    $('#go').textContent = "Lancer l'extraction"
+  }
+}
+
+$('#clear').onclick = async () => {
+  await api('/api/leads', { method: 'DELETE' })
+  await loadLeads()
+}
+
+api('/api/job').then(({ job, claude, apify }) => {
+  if (!apify) status('APIFY_TOKEN manquant : ajoute-le dans .env puis relance.', true)
+  else if (!claude) status('ANTHROPIC_API_KEY manquante : le scrape marchera, mais sans score ni accroche.', true)
+  showJob(job)
+  if (job.status === 'running') {
+    $('#go').disabled = true
+    polling = setInterval(() => poll().catch(() => {}), 3000)
+  }
+})
+loadLeads()
+</script>
+</body>
+</html>

@@ -12,7 +12,10 @@
     "dev:api": "tsx server/index.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "start": "tsx server/index.ts"
+    "start": "tsx server/index.ts",
+    "tool:agence": "tsx tools/marketing/server.ts",
+    "tool:leads": "tsx tools/leads/server.ts",
+    "tool:builder": "tsx tools/builder/server.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

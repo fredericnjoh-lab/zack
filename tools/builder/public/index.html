@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Générateur — décris ta douleur, repars avec un outil</title>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #131720; --panel-2: #1a1f2b; --line: #262d3b;
+    --text: #e8ecf4; --muted: #8b95a8; --accent: #ff5c39; --ok: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.02em; }
+  h2 { font-size: 17px; margin: 0; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; margin-bottom: 16px; }
+  .step { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .num { width: 24px; height: 24px; border-radius: 50%; background: var(--panel-2);
+    border: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; color: var(--muted); }
+  .num.on { border-color: var(--accent); color: var(--accent); }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  input, textarea { width: 100%; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font: inherit; resize: vertical; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+    padding: 11px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); font-weight: 400; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+  .field { margin-top: 14px; }
+  .out { white-space: pre-wrap; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px; margin-top: 10px; }
+  .cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+    background: #000; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+    color: var(--ok); overflow-x: auto; margin-top: 10px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .err { border-color: #7a2d2d; color: #ffb3a7; }
+  .hide { display: none; }
+  ul { margin: 10px 0 0; padding-left: 18px; }
+  li { margin-bottom: 5px; }
+  .file { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--muted); }
+  .q { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Générateur d'outils</h1>
+  <p class="sub">Tu décris ce qui te fait perdre du temps. Tu repars avec un vrai logiciel qui tourne, pas une maquette.</p>
+
+  <div id="status" class="card hide"></div>
+
+  <!-- 1 -->
+  <div class="card">
+    <div class="step"><span class="num on">1</span><h2>Décris la douleur, pas la solution</h2></div>
+    <div class="field">
+      <label for="metier">Ton métier</label>
+      <input id="metier" placeholder="Ex : agent immobilier" />
+    </div>
+    <div class="field">
+      <label for="douleur">Ce qui te fait perdre du temps chaque semaine</label>
+      <textarea id="douleur" rows="2" placeholder="Ex : je repasse 3 h à trier les demandes reçues par mail et à répondre les mêmes choses"></textarea>
+    </div>
+    <div class="field">
+      <label for="methode">Comment tu t'y prends aujourd'hui</label>
+      <textarea id="methode" rows="2" placeholder="Ex : je copie tout dans un Excel, puis je réponds à la main"></textarea>
+    </div>
+    <div class="row"><button id="ask">Pose-moi 5 questions</button></div>
+  </div>
+
+  <!-- 2 -->
+  <div id="step2" class="card hide">
+    <div class="step"><span class="num on">2</span><h2>Réponds, puis on décide de la V1</h2></div>
+    <div id="qlist"></div>
+    <div class="row"><button id="plan">Proposer le plus petit outil utile</button></div>
+  </div>
+
+  <!-- 3 -->
+  <div id="step3" class="card hide">
+    <div class="step"><span class="num on">3</span><h2>Le plan</h2></div>
+    <div id="planout"></div>
+    <div class="row">
+      <button id="build">Construire l'outil</button>
+      <button id="replan" class="ghost">Refaire un plan</button>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div id="step4" class="card hide">
+    <div class="step"><span class="num on">4</span><h2>Ton outil est écrit</h2></div>
+    <div id="buildout"></div>
+  </div>
+
+  <div id="projets"></div>
+</div>
+
+<script type="module">
+const $ = (s) => document.querySelector(s)
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+let questions = []
+let plan = null
+
+function status(msg, isErr) {
+  const el = $('#status')
+  if (!msg) { el.classList.add('hide'); return }
+  el.className = 'card' + (isErr ? ' err' : '')
+  el.textContent = msg
+}
+
+async function api(path, options) {
+  const res = await fetch(path, {
+    method: options?.method || 'GET',
+    headers: { 'content-type': 'application/json' },
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `erreur ${res.status}`)
+  return data
+}
+
+async function run(button, label, fn) {
+  const original = button.textContent
+  button.disabled = true
+  button.textContent = label
+  status('')
+  try { await fn() } catch (err) { status(err.message, true) }
+  button.disabled = false
+  button.textContent = original
+}
+
+const brief = () => `Métier : ${$('#metier').value}
+Ce qui fait perdre du temps : ${$('#douleur').value}
+Méthode actuelle : ${$('#methode').value}`
+
+$('#ask').onclick = () => run($('#ask'), 'Réflexion…', async () => {
+  const { questions: qs } = await api('/api/questions', {
+    method: 'POST',
+    body: { metier: $('#metier').value, douleur: $('#douleur').value, methode: $('#methode').value },
+  })
+  questions = qs
+  $('#qlist').innerHTML = qs.map((q, i) =>
+    `<div class="q"><label>${esc(q)}</label><input type="text" id="a${i}" /></div>`).join('')
+  $('#step2').classList.remove('hide')
+  $('#step2').scrollIntoView({ behavior: 'smooth', block: 'start' })
+})
+
+async function makePlan() {
+  const reponses = questions.map((q, i) =>
+    `${q}\n→ ${document.getElementById(`a${i}`)?.value || '(pas de réponse)'}`).join('\n\n')
+  const out = await api('/api/plan', { method: 'POST', body: { brief: brief(), reponses } })
+  plan = out.plan
+  $('#planout').innerHTML = `
+    <h2 style="margin-bottom:4px">${esc(plan.nom)}</h2>
+    <div class="muted">${esc(plan.pitch)}</div>
+    <div class="out">${esc(plan.plusPetiteVersion)}</div>
+    <div class="muted" style="margin-top:16px">Ce que l'outil garde en mémoire</div>
+    <ul>${(plan.donnees || []).map((d) => `<li>${esc(d)}</li>`).join('')}</ul>
+    <div class="muted" style="margin-top:14px">Ce qu'on voit à l'écran</div>
+    <ul>${(plan.ecrans || []).map((e) => `<li>${esc(e)}</li>`).join('')}</ul>
+    <div class="muted" style="margin-top:14px">Volontairement laissé pour plus tard</div>
+    <ul>${(plan.aPlusTard || []).map((a) => `<li>${esc(a)}</li>`).join('')}</ul>`
+  $('#step3').classList.remove('hide')
+  $('#step3').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+$('#plan').onclick = () => run($('#plan'), 'Réflexion…', makePlan)
+$('#replan').onclick = () => run($('#replan'), 'Réflexion…', makePlan)
+
+$('#build').onclick = () => run($('#build'), 'Écriture du code… (1 à 2 min)', async () => {
+  const { projet, commande } = await api('/api/generate', { method: 'POST', body: { plan } })
+  $('#buildout').innerHTML = `
+    <div class="muted">${projet.fichiers.length} fichiers écrits dans <span class="file">tools/builder/generated/${esc(projet.slug)}/</span></div>
+    <ul>${projet.fichiers.map((f) => `<li class="file">${esc(f)}</li>`).join('')}</ul>
+    <div class="muted" style="margin-top:16px">Pour le lancer, colle ça dans ton terminal :</div>
+    <div class="cmd">${esc(commande)}</div>
+    <div class="muted" style="margin-top:14px">
+      Ensuite, dans Claude Code : « ouvre tools/builder/generated/${esc(projet.slug)} et ajoute&nbsp;… ».
+      C'est comme ça que l'outil devient meilleur à mesure que ton métier s'affine.
+    </div>`
+  $('#step4').classList.remove('hide')
+  $('#step4').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  loadProjects()
+})
+
+async function loadProjects() {
+  const { projets, claude } = await api('/api/projects')
+  if (!claude) status('ANTHROPIC_API_KEY manquante : ajoute-la dans .env puis relance.', true)
+  $('#projets').innerHTML = projets.length
+    ? `<div class="card"><h2>Outils déjà générés</h2>${projets.map((p) => `
+        <div style="margin-top:14px">
+          <div><b>${esc(p.nom)}</b> <span class="muted">· ${new Date(p.creeLe).toLocaleDateString('fr-FR')}</span></div>
+          <div class="muted">${esc(p.pitch)}</div>
+          <div class="cmd">npx tsx tools/builder/generated/${esc(p.slug)}/server.ts</div>
+        </div>`).join('')}</div>`
+    : ''
+}
+
+loadProjects()
+</script>
+</body>
+</html>

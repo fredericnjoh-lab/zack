@@ -20,3 +20,54 @@ services:
         value: claude-sonnet-4-5
       - key: CRON_SECRET
         sync: false
+
+  # --- Outils tools/ : le Blueprint crée les trois ; supprime ceux dont tu n'as pas besoin ---
+  - type: web
+    name: agence
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --include=dev
+    startCommand: npm run tool:agence
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-5
+
+  - type: web
+    name: leads
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --include=dev
+    startCommand: npm run tool:leads
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-5
+
+  - type: web
+    name: builder
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --include=dev
+    startCommand: npm run tool:builder
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-5

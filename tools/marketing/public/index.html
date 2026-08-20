@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agence — une idée, trois formats</title>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #131720; --panel-2: #1a1f2b; --line: #262d3b;
+    --text: #e8ecf4; --muted: #8b95a8; --accent: #ff5c39; --ok: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tab { background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 14px; }
+  .tab.on { color: var(--text); border-color: var(--accent); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  textarea, input[type=text] { width: 100%; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font: inherit; resize: vertical; }
+  textarea:focus, input:focus { outline: none; border-color: var(--accent); }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+    padding: 11px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); font-weight: 400; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; cursor: pointer; font-size: 14px; }
+  .chip.on { border-color: var(--accent); }
+  .out { white-space: pre-wrap; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px; margin: 10px 0 0; }
+  .beat { display: grid; grid-template-columns: 68px 1fr; gap: 12px; padding: 9px 0;
+    border-bottom: 1px solid var(--line); }
+  .beat:last-child { border-bottom: 0; }
+  .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .vis { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .tags { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  h2 { font-size: 17px; margin: 0; }
+  .head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .err { border-color: #7a2d2d; color: #ffb3a7; }
+  .hide { display: none; }
+  li { margin-bottom: 5px; }
+  .q { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Agence</h1>
+  <p class="sub">Une idée en vrac → un post LinkedIn, un script de reel, une légende Instagram. Dans ta voix.</p>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="creer">Créer</button>
+    <button class="tab" data-tab="voix">Ma voix</button>
+    <button class="tab" data-tab="histo">Historique</button>
+  </div>
+
+  <div id="status" class="card hide"></div>
+
+  <!-- CRÉER -->
+  <section id="tab-creer">
+    <div class="card">
+      <label for="idee">Ton idée de départ</label>
+      <textarea id="idee" rows="3" placeholder="Une idée en vrac, un constat, un truc qu'un client t'a dit ce matin…"></textarea>
+      <div class="row">
+        <span class="chip on" data-p="linkedin">LinkedIn</span>
+        <span class="chip on" data-p="reel">Script reel 45s</span>
+        <span class="chip on" data-p="instagram">Légende Instagram</span>
+      </div>
+      <div class="row">
+        <button id="ask">Poser 3 questions d'abord</button>
+        <button id="go" class="ghost">Écrire directement</button>
+      </div>
+    </div>
+
+    <div id="questions" class="card hide">
+      <h2>3 questions pour viser juste</h2>
+      <div id="qlist" style="margin-top:14px"></div>
+      <div class="row"><button id="go2">Écrire avec ces réponses</button></div>
+    </div>
+
+    <div id="result"></div>
+  </section>
+
+  <!-- MA VOIX -->
+  <section id="tab-voix" class="hide">
+    <div class="card">
+      <h2>Donne-lui tes références</h2>
+      <p class="muted" style="margin:8px 0 14px">
+        Colle 3 à 10 contenus : des posts de créateurs qui t'inspirent, ou tes propres textes.
+        Claude en tire un style réutilisable, appliqué à tout ce que tu génères ensuite.
+      </p>
+      <label for="refs">Références (colle tes textes bruts, séparés par des lignes vides)</label>
+      <textarea id="refs" rows="10" placeholder="Post 1…&#10;&#10;Post 2…"></textarea>
+      <div style="margin-top:12px">
+        <label for="notes">Ce que tu veux garder / éviter (optionnel)</label>
+        <input id="notes" type="text" placeholder="Ex : garder l'humour, éviter les listes à puces" />
+      </div>
+      <div class="row">
+        <button id="analyze">Analyser et créer mon style</button>
+        <button id="reset" class="ghost">Effacer ma voix</button>
+      </div>
+    </div>
+    <div id="voice"></div>
+  </section>
+
+  <!-- HISTORIQUE -->
+  <section id="tab-histo" class="hide">
+    <div class="row" style="margin:0 0 14px"><button id="clear" class="ghost">Vider l'historique</button></div>
+    <div id="histo"></div>
+  </section>
+</div>
+
+<script type="module">
+const $ = (s) => document.querySelector(s)
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+let questions = []
+
+function status(msg, isErr) {
+  const el = $('#status')
+  if (!msg) { el.classList.add('hide'); return }
+  el.className = 'card' + (isErr ? ' err' : '')
+  el.textContent = msg
+}
+
+async function api(path, options) {
+  const res = await fetch(path, {
+    method: options?.method || 'GET',
+    headers: { 'content-type': 'application/json' },
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `erreur ${res.status}`)
+  return data
+}
+
+async function run(button, label, fn) {
+  const original = button.textContent
+  button.disabled = true
+  button.textContent = label
+  status('')
+  try { await fn() } catch (err) { status(err.message, true) }
+  button.disabled = false
+  button.textContent = original
+}
+
+// Onglets
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.onclick = () => {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t === tab))
+    for (const name of ['creer', 'voix', 'histo']) {
+      $(`#tab-${name}`).classList.toggle('hide', name !== tab.dataset.tab)
+    }
+    if (tab.dataset.tab === 'histo') loadHistory()
+    if (tab.dataset.tab === 'voix') loadVoice()
+  }
+})
+
+document.querySelectorAll('.chip').forEach((c) => { c.onclick = () => c.classList.toggle('on') })
+const platforms = () => [...document.querySelectorAll('.chip.on')].map((c) => c.dataset.p)
+
+function renderPiece(piece) {
+  const parts = []
+  if (piece.linkedin) {
+    parts.push(`<div class="card">
+      <div class="head"><h2>LinkedIn</h2><button class="ghost" data-copy="li-${piece.id}">Copier</button></div>
+      <p class="muted" style="margin:8px 0 0">Accroche : ${esc(piece.linkedin.accroche)}</p>
+      <div class="out" id="li-${piece.id}">${esc(piece.linkedin.post)}</div>
+      <div class="tags">${(piece.linkedin.hashtags || []).map((h) => esc(h)).join(' · ')}</div>
+    </div>`)
+  }
+  if (piece.reel) {
+    const beats = (piece.reel.beats || []).map((b) =>
+      `<div class="beat"><div class="t">${esc(b.t)}</div><div><div>${esc(b.texte)}</div><div class="vis">${esc(b.visuel)}</div></div></div>`).join('')
+    parts.push(`<div class="card">
+      <div class="head"><h2>Script reel · 45s</h2><button class="ghost" data-copy="rl-${piece.id}">Copier</button></div>
+      <p class="muted" style="margin:8px 0 12px">Accroche : ${esc(piece.reel.accroche)}</p>
+      ${beats}
+      <div class="tags">CTA : ${esc(piece.reel.cta)}</div>
+      <textarea class="hide" id="rl-${piece.id}">${esc((piece.reel.beats || []).map((b) => `${b.t} — ${b.texte}\n[${b.visuel}]`).join('\n\n'))}</textarea>
+    </div>`)
+  }
+  if (piece.instagram) {
+    parts.push(`<div class="card">
+      <div class="head"><h2>Instagram</h2><button class="ghost" data-copy="ig-${piece.id}">Copier</button></div>
+      <div class="out" id="ig-${piece.id}">${esc(piece.instagram.legende)}</div>
+      <div class="tags">${(piece.instagram.hashtags || []).map((h) => esc(h)).join(' ')}</div>
+    </div>`)
+  }
+  return parts.join('')
+}
+
+function wireCopy(root) {
+  root.querySelectorAll('[data-copy]').forEach((btn) => {
+    btn.onclick = async () => {
+      const el = document.getElementById(btn.dataset.copy)
+      await navigator.clipboard.writeText(el.value ?? el.textContent)
+      btn.textContent = 'Copié'
+      setTimeout(() => { btn.textContent = 'Copier' }, 1500)
+    }
+  })
+}
+
+$('#ask').onclick = () => run($('#ask'), 'Réflexion…', async () => {
+  const { questions: qs } = await api('/api/questions', { method: 'POST', body: { idee: $('#idee').value } })
+  questions = qs
+  $('#qlist').innerHTML = qs.map((q, i) =>
+    `<div class="q"><label>${esc(q)}</label><input type="text" id="a${i}" /></div>`).join('')
+  $('#questions').classList.remove('hide')
+})
+
+async function generate(button) {
+  const reponses = questions.length
+    ? questions.map((q, i) => `${q}\n→ ${document.getElementById(`a${i}`)?.value || '(pas de réponse)'}`).join('\n\n')
+    : ''
+  const { piece } = await api('/api/generate', {
+    method: 'POST',
+    body: { idee: $('#idee').value, platforms: platforms(), reponses },
+  })
+  $('#result').innerHTML = renderPiece(piece)
+  wireCopy($('#result'))
+  button.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+$('#go').onclick = () => run($('#go'), 'Écriture…', () => generate($('#go')))
+$('#go2').onclick = () => run($('#go2'), 'Écriture…', () => generate($('#go2')))
+
+async function loadVoice() {
+  const { voice, claude } = await api('/api/voice')
+  if (!claude) status('ANTHROPIC_API_KEY manquante : ajoute-la dans .env puis relance.', true)
+  if (!voice.resume) {
+    $('#voice').innerHTML = '<div class="card muted">Aucune voix définie pour l\'instant. Colle tes références au-dessus.</div>'
+    return
+  }
+  $('#voice').innerHTML = `<div class="card">
+    <h2>Ta voix</h2>
+    <div class="out">${esc(voice.resume)}</div>
+    <ul style="margin:14px 0 0; padding-left:18px">${(voice.regles || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+    <div class="tags"><b>LinkedIn</b> · ${esc(voice.linkedin)}</div>
+    <div class="tags"><b>Instagram</b> · ${esc(voice.instagram)}</div>
+    <div class="tags"><b>Reel</b> · ${esc(voice.reel)}</div>
+  </div>`
+}
+
+$('#analyze').onclick = () => run($('#analyze'), 'Analyse…', async () => {
+  await api('/api/voice/analyze', { method: 'POST', body: { references: $('#refs').value, notes: $('#notes').value } })
+  await loadVoice()
+})
+
+$('#reset').onclick = () => run($('#reset'), '…', async () => {
+  await api('/api/voice', { method: 'DELETE' })
+  await loadVoice()
+})
+
+async function loadHistory() {
+  const { pieces } = await api('/api/history')
+  $('#histo').innerHTML = pieces.length
+    ? pieces.map((p) => `<div class="card"><div class="muted">${new Date(p.createdAt).toLocaleString('fr-FR')}</div>
+        <h2 style="margin-top:6px">${esc(p.idee)}</h2></div>${renderPiece(p)}`).join('')
+    : '<div class="card muted">Rien encore.</div>'
+  wireCopy($('#histo'))
+}
+
+$('#clear').onclick = () => run($('#clear'), '…', async () => {
+  await api('/api/history', { method: 'DELETE' })
+  await loadHistory()
+})
+
+loadVoice()
+</script>
+</body>
+</html>
