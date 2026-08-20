@@ -9,6 +9,31 @@ type Copy = {
   heroLead: string
   heroMeta: string
 
+  productKicker: string
+  productTitle: string
+  productBody: string
+  screenshotAlt: string
+
+  useCasesKicker: string
+  useCasesTitle: string
+  useCasesLead: string
+  useCases: {
+    id: string
+    label: string
+    title: string
+    body: string
+    bullets: string[]
+    image: string
+    alt: string
+  }[]
+
+  editorialKicker: string
+  editorialTitle: string
+  editorialBody: string
+  editorialCta: string
+  founderPhotoAlt: string
+  shootPhotoAlt: string
+
   systemKicker: string
   flow: { n: string; title: string; body: string }[]
 
@@ -168,6 +193,97 @@ const fr: Copy = {
   heroLead:
     'Zack scanne leurs Reels, isole les vraies exceptions — pas les vues brutes — et te rend un script prêt à tourner dans la voix de ta marque.',
   heroMeta: 'Streetwear · DTC · ready-to-wear',
+
+  productKicker: 'Le signal, pas le bruit',
+  productTitle: 'Vois le marché comme une équipe contenu.',
+  productBody:
+    'Chaque matin, Zack classe les publications qui dépassent vraiment la norme de leur marque. Tu sais quoi étudier avant de décider quoi tourner.',
+  screenshotAlt: 'Tableau de veille Zack avec scores viraux et marques concurrentes',
+
+  useCasesKicker: 'Cas d’usage',
+  useCasesTitle: 'Un même signal. Cinq décisions plus rapides.',
+  useCasesLead:
+    'Choisis ton point de départ : une marque à surveiller, un format à reconstruire ou un calendrier à remplir.',
+  useCases: [
+    {
+      id: 'radar',
+      label: 'Détecter',
+      title: 'Repère le post qui change la trajectoire d’une marque.',
+      body:
+        'Zack compare chaque Reel à la médiane du compte et du même format. Un 8k vues peut être un meilleur signal qu’un 800k.',
+      bullets: [
+        'Score viral relatif, pas classement aux vues brutes',
+        'Veille automatique de 3 à 20 marques',
+        'Découverte de concurrents du même segment',
+      ],
+      image: 'screenshots/zack-01-radar-tab.webp',
+      alt: 'Veille concurrentielle Zack avec score viral',
+    },
+    {
+      id: 'product',
+      label: 'Reconstruire',
+      title: 'Transforme un carrousel gagnant en brief produit.',
+      body:
+        'Zack explique pourquoi le visuel a fonctionné, puis livre la légende, les hashtags et le plan de prises — fidèle à la structure ou réécrit dans ta voix.',
+      bullets: [
+        'Photos et carrousels scorés séparément',
+        'Mode à l’identique ou dans ma voix',
+        'Shot list prête pour le studio',
+      ],
+      image: 'screenshots/zack-02-produit-tab.webp',
+      alt: 'Remake de publication produit dans Zack',
+    },
+    {
+      id: 'script',
+      label: 'Tourner',
+      title: 'Passe du Reel concurrent au script prêt caméra.',
+      body:
+        'OCR du texte à l’écran, séquençage seconde par seconde, ton de jeu et sous-titres : l’équipe reçoit un plan de tournage, pas une page blanche.',
+      bullets: [
+        'Accroche, beats et CTA minutés',
+        'Deux légendes prêtes à publier',
+        'Règles de marque mémorisées',
+      ],
+      image: 'screenshots/zack-03-script-tab.webp',
+      alt: 'Script Reel minuté généré par Zack',
+    },
+    {
+      id: 'calendar',
+      label: 'Planifier',
+      title: 'Fais atterrir les bons formats dans la semaine.',
+      body:
+        'Glisse les idées retenues dans le calendrier et fais-les avancer de écrit à tourné, puis publié. La veille devient une cadence.',
+      bullets: [
+        'Boîte à idées reliée au calendrier',
+        'Statuts écrit, tourné et publié',
+        'Une vue commune pour le prochain drop',
+      ],
+      image: 'screenshots/zack-04-calendar-tab.webp',
+      alt: 'Calendrier éditorial Zack pour une marque de vêtements',
+    },
+    {
+      id: 'brand',
+      label: 'Aligner',
+      title: 'Apprends à Zack ce que ta marque ne dirait jamais.',
+      body:
+        'Analyse ton compte, dépose ton brand book et retiens chaque correction. Les prochains scripts partent de ta voix, pas d’un ton IA générique.',
+      bullets: [
+        'Analyse des piliers et formats de la marque',
+        'Brand book et briefs intégrés',
+        'Corrections transformées en règles',
+      ],
+      image: 'screenshots/zack-05-brand-tab.webp',
+      alt: 'Espace ADN de marque dans Zack',
+    },
+  ],
+
+  editorialKicker: 'Du signal au studio',
+  editorialTitle: 'Pensé pour les équipes qui ont un drop à sortir — pas un feed à analyser.',
+  editorialBody:
+    'Fondateur seul, social manager ou petite équipe créative : Zack raccourcit la distance entre “ça marche chez eux” et “voici ce qu’on tourne demain”.',
+  editorialCta: 'Voir Zack en action',
+  founderPhotoAlt: 'Fondateur de marque streetwear analysant Instagram dans son studio',
+  shootPhotoAlt: 'Équipe créative pendant un shooting de contenu streetwear',
 
   systemKicker: 'Système',
   flow: [
@@ -360,6 +476,97 @@ const en: Copy = {
   heroLead:
     'Zack scans their Reels, isolates the real outliers — not raw views — and hands back a shoot-ready script in your brand’s voice.',
   heroMeta: 'Streetwear · DTC · ready-to-wear',
+
+  productKicker: 'Signal, not noise',
+  productTitle: 'See the market like a content team.',
+  productBody:
+    'Every morning, Zack ranks the posts that genuinely outperform each brand’s norm. You know what to study before deciding what to shoot.',
+  screenshotAlt: 'Zack monitoring dashboard with viral scores and competing brands',
+
+  useCasesKicker: 'Use cases',
+  useCasesTitle: 'One signal. Five faster decisions.',
+  useCasesLead:
+    'Choose your starting point: a brand to monitor, a format to rebuild, or a calendar to fill.',
+  useCases: [
+    {
+      id: 'radar',
+      label: 'Detect',
+      title: 'Spot the post that changes a brand’s trajectory.',
+      body:
+        'Zack compares every Reel with that account’s median for the same format. An 8k-view post can be a stronger signal than an 800k one.',
+      bullets: [
+        'Relative viral score, not raw-view rankings',
+        'Automatic monitoring for 3 to 20 brands',
+        'Discovery of competitors in the same segment',
+      ],
+      image: 'screenshots/zack-01-radar-tab.webp',
+      alt: 'Zack competitor radar with viral score',
+    },
+    {
+      id: 'product',
+      label: 'Rebuild',
+      title: 'Turn a winning carousel into a product brief.',
+      body:
+        'Zack explains why the visual landed, then delivers the caption, hashtags and shot plan — faithful to the structure or rewritten in your voice.',
+      bullets: [
+        'Photos and carousels scored separately',
+        'Identical or in-my-voice mode',
+        'Studio-ready shot list',
+      ],
+      image: 'screenshots/zack-02-produit-tab.webp',
+      alt: 'Product post remake in Zack',
+    },
+    {
+      id: 'script',
+      label: 'Shoot',
+      title: 'Go from competitor Reel to camera-ready script.',
+      body:
+        'On-screen OCR, second-by-second sequencing, delivery tone and subtitles: the team gets a shooting plan, not a blank page.',
+      bullets: [
+        'Timed hook, beats and CTA',
+        'Two publish-ready captions',
+        'Brand rules remembered',
+      ],
+      image: 'screenshots/zack-03-script-tab.webp',
+      alt: 'Timed Reel script generated by Zack',
+    },
+    {
+      id: 'calendar',
+      label: 'Plan',
+      title: 'Land the right formats in this week’s calendar.',
+      body:
+        'Drag selected ideas into the calendar and move them from written to shot to posted. Monitoring becomes a cadence.',
+      bullets: [
+        'Idea inbox connected to the calendar',
+        'Written, shot and posted statuses',
+        'One view for the next drop',
+      ],
+      image: 'screenshots/zack-04-calendar-tab.webp',
+      alt: 'Zack editorial calendar for a clothing brand',
+    },
+    {
+      id: 'brand',
+      label: 'Align',
+      title: 'Teach Zack what your brand would never say.',
+      body:
+        'Analyze your account, upload your brand book and save every correction. The next scripts start from your voice, not generic AI tone.',
+      bullets: [
+        'Brand pillars and format analysis',
+        'Brand book and briefs built in',
+        'Corrections turned into rules',
+      ],
+      image: 'screenshots/zack-05-brand-tab.webp',
+      alt: 'Brand DNA workspace in Zack',
+    },
+  ],
+
+  editorialKicker: 'From signal to studio',
+  editorialTitle: 'Built for teams with a drop to ship — not a feed to analyze.',
+  editorialBody:
+    'Solo founder, social manager or small creative team: Zack shortens the distance between “it works for them” and “this is what we shoot tomorrow”.',
+  editorialCta: 'See Zack in action',
+  founderPhotoAlt: 'Streetwear founder reviewing Instagram in their studio',
+  shootPhotoAlt: 'Creative team producing streetwear content',
 
   systemKicker: 'System',
   flow: [

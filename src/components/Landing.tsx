@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { dict, type Lang } from '../lib/i18n'
 
 type LandingProps = {
@@ -7,12 +8,16 @@ type LandingProps = {
 
 export function Landing({ onTry, lang }: LandingProps) {
   const t = dict[lang]
+  const [activeUseCase, setActiveUseCase] = useState(t.useCases[0].id)
+  const active = t.useCases.find((item) => item.id === activeUseCase) || t.useCases[0]
+  const asset = (path: string) =>
+    new URL(path, new URL(import.meta.env.BASE_URL, window.location.origin)).toString()
 
   return (
     <main className="landing">
       <section className="landing-hero" aria-label="Zack">
         <div className="landing-hero-media" aria-hidden="true">
-          <img src={`${import.meta.env.BASE_URL}zack-hero-fashion.jpg`} alt="" />
+          <img src={asset('zack-hero-fashion.webp')} alt="" />
         </div>
         <div className="landing-hero-veil" aria-hidden="true" />
         <div className="landing-hero-copy">
@@ -25,6 +30,87 @@ export function Landing({ onTry, lang }: LandingProps) {
             </button>
             <p className="landing-meta">{t.heroMeta}</p>
           </div>
+        </div>
+      </section>
+
+      <section className="landing-block product-proof">
+        <div className="proof-copy">
+          <p className="landing-kicker">{t.productKicker}</p>
+          <h2 className="landing-block-title">{t.productTitle}</h2>
+          <p className="landing-section-lead">{t.productBody}</p>
+        </div>
+        <div className="product-window">
+          <div className="product-window-bar" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <strong>Zack / Radar</strong>
+          </div>
+          <img
+            src={asset('screenshots/zack-01-radar-tab.webp')}
+            alt={t.screenshotAlt}
+            loading="lazy"
+          />
+        </div>
+      </section>
+
+      <section className="landing-block use-cases">
+        <div className="use-cases-head">
+          <p className="landing-kicker">{t.useCasesKicker}</p>
+          <h2 className="landing-block-title">{t.useCasesTitle}</h2>
+          <p className="landing-section-lead">{t.useCasesLead}</p>
+        </div>
+
+        <div className="use-case-tabs" role="tablist" aria-label={t.useCasesKicker}>
+          {t.useCases.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={item.id === active.id}
+              aria-controls="zack-use-case"
+              className={`use-case-tab${item.id === active.id ? ' active' : ''}`}
+              onClick={() => setActiveUseCase(item.id)}
+            >
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <article className="use-case-stage" id="zack-use-case" role="tabpanel">
+          <div className="use-case-copy">
+            <p className="use-case-label">{active.label}</p>
+            <h3>{active.title}</h3>
+            <p>{active.body}</p>
+            <ul>
+              {active.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="use-case-visual">
+            <img src={asset(active.image)} alt={active.alt} loading="lazy" />
+          </div>
+        </article>
+      </section>
+
+      <section className="landing-block editorial-story">
+        <div className="editorial-copy">
+          <p className="landing-kicker">{t.editorialKicker}</p>
+          <h2 className="landing-block-title">{t.editorialTitle}</h2>
+          <p className="landing-section-lead">{t.editorialBody}</p>
+          <button type="button" className="cta" onClick={onTry}>
+            {t.editorialCta}
+          </button>
+        </div>
+        <div className="editorial-photos">
+          <figure className="editorial-photo editorial-photo-main">
+            <img src={asset('zack-founder-studio.webp')} alt={t.founderPhotoAlt} loading="lazy" />
+          </figure>
+          <figure className="editorial-photo editorial-photo-secondary">
+            <img src={asset('zack-content-shoot.webp')} alt={t.shootPhotoAlt} loading="lazy" />
+          </figure>
         </div>
       </section>
 
