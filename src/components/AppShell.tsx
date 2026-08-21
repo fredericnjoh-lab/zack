@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { zackApi } from '../lib/api'
 import { dict, type Lang } from '../lib/i18n'
+import { instagramTarget, type InstagramRef } from '../lib/instagram'
 import { LangToggle } from './StickyHeader'
 import type {
   AutoVeilleSettings,
@@ -35,6 +36,41 @@ function imageProxy(source?: string): string | undefined {
   if (!source) return undefined
   const params = new URLSearchParams({ url: source })
   return `/api/image?${params.toString()}`
+}
+
+/**
+ * Thumbnail wrapper that opens the competitor post on Instagram, falling back to
+ * the account when the post URL is missing. Renders a plain box when neither the
+ * post nor the handle resolves to an instagram.com address.
+ */
+function InstagramThumb({
+  c,
+  post,
+  className,
+  children,
+}: {
+  c: AppCopy
+  post: InstagramRef
+  className: string
+  children: ReactNode
+}) {
+  const target = instagramTarget(post)
+  if (!target) return <div className={className}>{children}</div>
+
+  const handle = post.handle || ''
+  const label = target.kind === 'post' ? c.openPost(handle) : c.openProfile(handle)
+  return (
+    <a
+      className={className}
+      href={target.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={label}
+      aria-label={label}
+    >
+      {children}
+    </a>
+  )
 }
 
 export function AppShell({ onBack, lang, onLang }: AppShellProps) {
@@ -74,6 +110,13 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
   const [error, setError] = useState('')
   const [handleInput, setHandleInput] = useState('')
   const [manual, setManual] = useState({ handle: '', views: '', caption: '', baseline: '' })
+
+  // A script keeps a pointer to the competitor post it was built from, so the
+  // Script tab can show the same clickable thumbnail as Veille and Produit.
+  const scriptSource = script?.sourceReelId
+    ? hits.find((r) => r.id === script.sourceReelId) ||
+      photoHits.find((r) => r.id === script.sourceReelId)
+    : undefined
 
   // The greeting follows the active language until the user starts talking.
   useEffect(() => {
@@ -457,6 +500,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
         <ScriptPanel
           c={c}
           script={script}
+          sourceReel={scriptSource}
           busy={busy}
           onShorten={async () => {
             if (!script) return
@@ -692,7 +736,7 @@ function ProfilePanel(props: {
 
           <div className="profile-gallery">
             {props.profile.posts.slice(0, 12).map((post) => (
-              <a href={post.url} target="_blank" rel="noreferrer" className="profile-post" key={post.id}>
+              <InstagramThumb c={c} post={post} className="profile-post" key={post.id}>
                 {post.imageUrl ? (
                   <img src={imageProxy(post.imageUrl)} alt={c.postAlt(post.handle)} loading="lazy" />
                 ) : (
@@ -701,7 +745,7 @@ function ProfilePanel(props: {
                 <small>
                   {formatViews(post.views)} {post.mediaType === 'reel' ? c.views : c.likes}
                 </small>
-              </a>
+              </InstagramThumb>
             ))}
           </div>
         </>
@@ -886,12 +930,12 @@ function VeillePanel(props: {
         const tr = props.transcriptions[reel.id]
         return (
           <article className="reel" key={reel.id}>
-            <div className="thumb media-thumb">
+            <InstagramThumb c={c} post={reel} className="thumb media-thumb">
               {reel.imageUrl ? (
                 <img src={imageProxy(reel.imageUrl)} alt={c.thumbAlt(reel.handle)} loading="lazy" />
               ) : null}
               <span>{formatViews(reel.views)}</span>
-            </div>
+            </InstagramThumb>
             <div>
               <h4>{reel.caption || c.noCaption}</h4>
               <p>
@@ -972,14 +1016,14 @@ function PhotosPanel(props: {
         const variant = remake ? remake[chosen] : null
         return (
           <article className="reel photo" key={post.id}>
-            <div className="thumb photo-thumb media-thumb">
+            <InstagramThumb c={c} post={post} className="thumb photo-thumb media-thumb">
               {post.imageUrl ? (
                 <img src={imageProxy(post.imageUrl)} alt={c.postAlt(post.handle)} loading="lazy" />
               ) : (
                 <b>{post.mediaType === 'carousel' ? '❏' : '▢'}</b>
               )}
               <span>{formatViews(post.views)}</span>
-            </div>
+            </InstagramThumb>
             <div style={{ gridColumn: '2 / -1' }}>
               <h4>{post.caption || c.noPostCaption}</h4>
               <p>
@@ -1059,12 +1103,14 @@ function PhotosPanel(props: {
 function ScriptPanel({
   c,
   script,
+  sourceReel,
   busy,
   onShorten,
   onRememberRule,
 }: {
   c: AppCopy
   script: GeneratedScript | null
+  sourceReel?: ScoredReel
   busy: boolean
   onShorten: () => void
   onRememberRule: (rule: string) => void
@@ -1085,11 +1131,30 @@ function ScriptPanel({
   return (
     <section className="panel">
       <article className="script">
-        <h3>{script.title}</h3>
-        <p className="meta">
-          {c.generatedOn} {new Date(script.createdAt).toLocaleString(c.locale)} · {script.beats.length}{' '}
-          {c.beats}
-        </p>
+        <div className={`script-head${sourceReel ? ' script-source' : ''}`}>
+          {sourceReel && (
+            <InstagramThumb c={c} post={sourceReel} className="thumb media-thumb source-thumb">
+              {sourceReel.imageUrl ? (
+                <img
+                  src={imageProxy(sourceReel.imageUrl)}
+                  alt={c.thumbAlt(sourceReel.handle)}
+                  loading="lazy"
+                />
+              ) : (
+                <b>{sourceReel.mediaType === 'carousel' ? '❏' : '▶'}</b>
+              )}
+              <span>{formatViews(sourceReel.views)}</span>
+            </InstagramThumb>
+          )}
+          <div>
+            <h3>{script.title}</h3>
+            <p className="meta">
+              {c.generatedOn} {new Date(script.createdAt).toLocaleString(c.locale)} ·{' '}
+              {script.beats.length} {c.beats}
+              {sourceReel ? ` · ${c.sourcePost} @${sourceReel.handle}` : ''}
+            </p>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <button type="button" className="cta ghost" disabled={busy} onClick={onShorten}>
             {c.shorten}

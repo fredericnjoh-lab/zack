@@ -649,6 +649,23 @@ img {
   font-weight: 700;
 }
 
+/* Thumbnails that link out to the competitor post on Instagram. */
+a.thumb,
+a.profile-post {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.media-thumb:hover img {
+  transform: scale(1.07);
+}
+
+a.thumb:focus-visible,
+a.profile-post:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .reel h4 {
   margin: 0 0 5px;
   font-size: 1rem;
@@ -1027,6 +1044,18 @@ img {
   margin-bottom: 18px;
 }
 
+.script-source {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.script-source .source-thumb {
+  place-items: center;
+  font-size: 22px;
+}
+
 .beat {
   display: grid;
   grid-template-columns: 62px 1fr;
@@ -1213,6 +1242,7 @@ button.pill:hover {
   .profile-gallery { grid-template-columns: repeat(3, 1fr); }
 
   .reel { grid-template-columns: 68px 1fr; }
+  .script-source { grid-template-columns: 68px 1fr; }
   .thumb { width: 68px; height: 92px; }
   .score { grid-column: 2; text-align: left; }
   .score strong { font-size: 1.3rem; }
