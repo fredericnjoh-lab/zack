@@ -133,6 +133,7 @@ export type Store = {
   writingGuide?: WritingGuide
   autoVeille?: AutoVeilleSettings
   discoveries?: DiscoveredAccount[]
+  repost?: RepostState
 }
 
 export type StatusPayload = {
@@ -143,4 +144,80 @@ export type StatusPayload = {
   reels: number
   lastVeilleAt?: string
   lastVeilleMode?: string
+}
+
+/** Un post Instagram source, candidat au repost YouTube. */
+export type RepostCandidate = {
+  /** id Instagram (ou shortCode en secours) */
+  id: string
+  shortCode?: string
+  handle: string
+  url?: string
+  caption?: string
+  /** URL directe du .mp4 (absente pour photos/carrousels) */
+  videoUrl?: string
+  thumbnailUrl?: string
+  durationSec?: number
+  takenAt?: string
+  views?: number
+  likes?: number
+  comments?: number
+  mediaType: MediaType
+  /** Rempli côté API : déjà publié sur YouTube ? */
+  alreadyPosted?: boolean
+  youtubeUrl?: string
+}
+
+export type RepostPrivacy = 'private' | 'unlisted' | 'public'
+
+export type RepostedItem = {
+  id: string
+  /** RepostCandidate.id d'origine — clé de dédoublonnage */
+  sourceId: string
+  shortCode?: string
+  handle: string
+  sourceUrl?: string
+  thumbnailUrl?: string
+  youtubeVideoId: string
+  youtubeUrl: string
+  title: string
+  description: string
+  tags: string[]
+  privacyStatus: RepostPrivacy
+  postedAt: string
+}
+
+export type RepostSettings = {
+  /** Compte Instagram source (le tien) */
+  sourceHandle: string
+  /** Chaîne YouTube cible, pour affichage uniquement */
+  youtubeHandle?: string
+  privacyStatus: RepostPrivacy
+  /** Repost auto au passage du cron quotidien */
+  autoEnabled: boolean
+  /** Nombre max de vidéos publiées par run */
+  maxPerRun: number
+  /** 'ai' = titre/description réécrits par Claude pour le SEO YouTube */
+  titleStyle: 'caption' | 'ai'
+  /** Hashtags ajoutés à chaque description */
+  extraTags: string[]
+  /** Ajoute #Shorts au titre pour forcer le format vertical */
+  markAsShorts: boolean
+  lastScanAt?: string
+  lastRunAt?: string
+}
+
+export type YoutubeChannel = {
+  id: string
+  title: string
+  customUrl?: string
+}
+
+export type RepostState = {
+  settings: RepostSettings
+  candidates: RepostCandidate[]
+  published: RepostedItem[]
+  /** Obtenu via l'écran OAuth, persiste le lien à la chaîne */
+  youtubeRefreshToken?: string
+  youtubeChannel?: YoutubeChannel
 }

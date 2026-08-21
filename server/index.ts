@@ -5,6 +5,18 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { fetchReelsForHandles, hasApify } from './apify.ts'
+import {
+  activeRefreshToken,
+  connectYoutube,
+  decorate,
+  disconnectYoutube,
+  getRepostJob,
+  repostState,
+  startRepostJob,
+  startScanJob,
+  youtubeConnected,
+} from './repost.ts'
+import { authUrl, exchangeCode, hasOAuthApp } from './youtube.ts'
 import { loadStore, normalizeHandle, saveStore, writingContext } from './db.ts'
 import { getVeilleJob, startVeilleJob } from './jobs.ts'
 import {
@@ -543,7 +555,166 @@ app.post('/api/photos/remake', async (req, res) => {
   }
 })
 
-app.post('/api/chat', async (req, res) => {
+/* ---------------------------------------------------------------- Repost IG → YouTube */
+
+/** L'URI de redirection doit être identique côté Google Cloud Console. */
+function redirectUri(req: express.Request): string {
+  if (process.env.YOUTUBE_REDIRECT_URI) return process.env.YOUTUBE_REDIRECT_URI
+  const proto = (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0]!.trim()
+  return `${proto}://${req.get('host')}/api/youtube/callback`
+}
+
+app.get('/api/repost', (req, res) => {
+  const store = loadStore()
+  const state = repostState(store)
+  saveStore(store)
+  res.json({
+    settings: state.settings,
+    candidates: decorate(state.candidates, state),
+    published: state.published,
+    youtube: {
+      configured: hasOAuthApp(),
+      connected: youtubeConnected(store),
+      channel: state.youtubeChannel || null,
+      redirectUri: redirectUri(req),
+    },
+    apify: hasApify(),
+    llm: llmProvider(),
+    job: getRepostJob(),
+  })
+})
+
+app.get('/api/repost/job', (_req, res) => {
+  res.json({ job: getRepostJob() })
+})
+
+app.post('/api/repost/settings', (req, res) => {
+  const parsed = z
+    .object({
+      sourceHandle: z.string().min(1).optional(),
+      youtubeHandle: z.string().optional(),
+      privacyStatus: z.enum(['private', 'unlisted', 'public']).optional(),
+      autoEnabled: z.boolean().optional(),
+      maxPerRun: z.number().int().min(1).max(10).optional(),
+      titleStyle: z.enum(['caption', 'ai']).optional(),
+      extraTags: z.array(z.string().min(1).max(40)).max(15).optional(),
+      markAsShorts: z.boolean().optional(),
+    })
+    .safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'réglages repost invalides' })
+
+  const store = loadStore()
+  const state = repostState(store)
+  const next = { ...state.settings, ...parsed.data }
+  if (parsed.data.sourceHandle) next.sourceHandle = normalizeHandle(parsed.data.sourceHandle)
+  if (parsed.data.extraTags) {
+    next.extraTags = [...new Set(parsed.data.extraTags.map((t) => t.replace(/^#/, '').trim()))]
+  }
+  state.settings = next
+  saveStore(store)
+  res.json({ settings: state.settings })
+})
+
+app.post('/api/repost/scan', (req, res) => {
+  const handle = typeof req.body?.handle === 'string' ? req.body.handle : undefined
+  const { started, job } = startScanJob(handle)
+  res.json({ started, job, async: true })
+})
+
+app.post('/api/repost/publish', (req, res) => {
+  const parsed = z
+    .object({
+      sourceIds: z.array(z.string().min(1)).max(10).optional(),
+      lang: z.enum(['fr', 'en']).optional(),
+    })
+    .safeParse(req.body ?? {})
+  if (!parsed.success) return res.status(400).json({ error: 'sourceIds invalides' })
+  const { started, job } = startRepostJob({
+    sourceIds: parsed.data.sourceIds,
+    lang: pickLang(parsed.data.lang),
+    source: 'ui',
+  })
+  res.json({ started, job, async: true })
+})
+
+/** Cron quotidien : republie les derniers Reels si l'auto-repost est activé. */
+app.post('/api/cron/repost', (req, res) => {
+  const secret = process.env.CRON_SECRET
+  if (secret) {
+    const header = req.get('x-cron-secret') || ''
+    const bodySecret = typeof req.body?.secret === 'string' ? req.body.secret : ''
+    if (header !== secret && bodySecret !== secret) {
+      return res.status(401).json({ error: t(pickLang(req.body?.lang)).cronBadSecret })
+    }
+  }
+  const store = loadStore()
+  const state = repostState(store)
+  if (!state.settings.autoEnabled) {
+    return res.json({ ok: true, started: false, reason: 'auto-repost désactivé', job: getRepostJob() })
+  }
+  const { started, job } = startRepostJob({ auto: true, source: 'cron' })
+  res.json({ ok: true, started, job })
+})
+
+app.get('/api/youtube/auth-url', (req, res) => {
+  if (!hasOAuthApp()) {
+    return res.status(400).json({ error: 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET manquants' })
+  }
+  res.json({ url: authUrl(redirectUri(req)), redirectUri: redirectUri(req) })
+})
+
+/** Retour d'OAuth Google : on échange le code puis on referme l'onglet. */
+app.get('/api/youtube/callback', async (req, res) => {
+  const code = typeof req.query.code === 'string' ? req.query.code : ''
+  const oauthError = typeof req.query.error === 'string' ? req.query.error : ''
+  const page = (title: string, body: string) =>
+    `<!doctype html><meta charset="utf-8"><title>${title}</title>` +
+    `<body style="font-family:system-ui;background:#0e0e16;color:#f5f5fa;padding:40px;line-height:1.6">` +
+    `<h1 style="font-size:1.3rem">${title}</h1>${body}` +
+    `<p style="color:#9a9ab0">Tu peux fermer cet onglet et revenir dans Zack.</p></body>`
+
+  if (oauthError || !code) {
+    return res
+      .status(400)
+      .send(page('Connexion YouTube refusée', `<p>${oauthError || 'code manquant'}</p>`))
+  }
+  try {
+    const refreshToken = await exchangeCode(code, redirectUri(req))
+    const channel = await connectYoutube(refreshToken)
+    res.send(
+      page(
+        `Chaîne « ${channel.title} » connectée`,
+        `<p>Zack peut maintenant publier sur cette chaîne.</p>` +
+          `<p style="color:#9a9ab0">Pour survivre à un redéploiement Render, ajoute cette variable d’environnement :</p>` +
+          `<pre style="white-space:pre-wrap;word-break:break-all;background:#181826;padding:14px;border-radius:12px">GOOGLE_REFRESH_TOKEN=${refreshToken}</pre>`,
+      ),
+    )
+  } catch (err) {
+    res
+      .status(502)
+      .send(page('Connexion YouTube échouée', `<p>${err instanceof Error ? err.message : 'erreur'}</p>`))
+  }
+})
+
+app.get('/api/youtube/status', (req, res) => {
+  const store = loadStore()
+  const state = repostState(store)
+  res.json({
+    configured: hasOAuthApp(),
+    connected: youtubeConnected(store),
+    channel: state.youtubeChannel || null,
+    fromEnv: !state.youtubeRefreshToken && Boolean(activeRefreshToken(store)),
+    redirectUri: redirectUri(req),
+  })
+})
+
+app.post('/api/youtube/disconnect', (_req, res) => {
+  disconnectYoutube()
+  res.json({ connected: false })
+})
+
+app.post('/api/chat',
+ async (req, res) => {
   const parsed = z
     .object({ message: z.string().min(1), lang: z.enum(['fr', 'en']).optional() })
     .safeParse(req.body)
@@ -578,6 +749,29 @@ app.post('/api/chat', async (req, res) => {
           : job.status === 'running'
             ? m.chatVeilleBusy
             : m.chatVeilleFail({ err: job.error || 'error' }),
+        actions,
+        job,
+      })
+    }
+
+    if (
+      text.includes('repost') ||
+      text.includes('youtube') ||
+      text.includes('republie') ||
+      text.includes('republier')
+    ) {
+      const state = repostState(store)
+      const { started, job } = startRepostJob({ auto: true, lang, source: 'chat' })
+      actions.push('repost_run')
+      return res.json({
+        reply: started
+          ? m.chatRepostStarted({
+              handle: state.settings.sourceHandle,
+              n: state.settings.maxPerRun,
+            })
+          : job.status === 'running'
+            ? m.chatRepostBusy
+            : m.chatRepostFail({ err: job.error || 'error' }),
         actions,
         job,
       })

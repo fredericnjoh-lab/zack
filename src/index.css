@@ -2142,3 +2142,95 @@ button.pill:hover {
 .landing-brand {
   text-transform: uppercase;
 }
+
+/* Repost Instagram → YouTube */
+.tabs.tabs-7 { grid-template-columns: repeat(7, 1fr); }
+
+.repost-settings {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.repost-settings label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.repost-settings select {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.repost-settings .toggle-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.repost-settings .toggle-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.repost-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.repost-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.repost-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+a.pill {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.repost-history li {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .tabs.tabs-7 { grid-template-columns: repeat(4, 1fr); }
+  .repost-settings { grid-template-columns: 1fr; }
+}

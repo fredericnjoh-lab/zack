@@ -43,8 +43,53 @@ type Copy = {
 
   endTitle: string
 
-  tabs: Record<'profil' | 'veille' | 'photos' | 'script' | 'calendrier' | 'chat', string>
+  tabs: Record<'profil' | 'veille' | 'photos' | 'script' | 'calendrier' | 'repost' | 'chat', string>
   app: AppCopy
+}
+
+type RepostCopy = {
+  kicker: string
+  title: string
+  body: string
+  sourceLabel: string
+  sourcePlaceholder: string
+  connectTitle: string
+  connectBody: string
+  connect: string
+  connectedTo: (channel: string) => string
+  disconnect: string
+  notConfigured: string
+  scan: string
+  scanning: string
+  publish: (n: number) => string
+  publishing: string
+  selectAll: string
+  clearSelection: string
+  noApify: string
+  empty: string
+  emptyHint: string
+  alreadyPosted: string
+  photoOnly: string
+  watchOnYoutube: string
+  viewSource: string
+  privacy: string
+  privacyPrivate: string
+  privacyUnlisted: string
+  privacyPublic: string
+  titleStyle: string
+  styleAi: string
+  styleCaption: string
+  shortsLabel: string
+  autoLabel: string
+  maxPerRun: string
+  saved: string
+  lastScan: (when: string) => string
+  lastRun: (when: string) => string
+  viewsLabel: string
+  historyTitle: string
+  historyEmpty: string
+  running: string
+  copyrightNote: string
 }
 
 type AppCopy = {
@@ -80,6 +125,9 @@ type AppCopy = {
   errRemake: string
   errShorten: string
   errVeille: string
+  errRepost: string
+
+  repost: RepostCopy
 
   dnaKicker: string
   dnaTitle: string
@@ -321,6 +369,7 @@ const fr: Copy = {
     photos: 'Produit',
     script: 'Script',
     calendrier: 'Agenda',
+    repost: 'Repost',
     chat: 'Zack',
   },
 
@@ -358,6 +407,55 @@ const fr: Copy = {
     errRemake: 'remake échoué',
     errShorten: 'raccourci échoué',
     errVeille: 'veille échouée',
+    errRepost: 'repost échoué',
+
+    repost: {
+      kicker: 'Instagram → YouTube',
+      title: 'Republie ton contenu Instagram sur ta chaîne YouTube.',
+      body:
+        'Zack lit ton compte Instagram, récupère les vidéos, réécrit titre et description pour YouTube, puis les envoie en Shorts sur ta chaîne. Chaque post n’est publié qu’une fois.',
+      sourceLabel: 'Compte Instagram source',
+      sourcePlaceholder: 'fredjoclothing.paris',
+      connectTitle: 'Chaîne YouTube',
+      connectBody: 'Connecte la chaîne qui recevra les vidéos. Zack ne demande que le droit de publier.',
+      connect: 'Connecter YouTube',
+      connectedTo: (channel: string) => `Connecté à ${channel}`,
+      disconnect: 'Déconnecter',
+      notConfigured:
+        'Ajoute GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET (Google Cloud → OAuth) pour activer la publication.',
+      scan: 'Lire mon Instagram',
+      scanning: 'Lecture Instagram…',
+      publish: (n: number) => (n <= 1 ? 'Publier sur YouTube' : `Publier ${n} vidéos sur YouTube`),
+      publishing: 'Envoi vers YouTube…',
+      selectAll: 'Tout sélectionner',
+      clearSelection: 'Vider la sélection',
+      noApify: 'APIFY_TOKEN manquant — Zack ne peut pas lire Instagram.',
+      empty: 'Aucune vidéo récupérée pour l’instant.',
+      emptyHint: 'Lance « Lire mon Instagram » pour charger tes derniers posts.',
+      alreadyPosted: 'Déjà sur YouTube',
+      photoOnly: 'Photo — pas de vidéo à republier',
+      watchOnYoutube: 'Voir sur YouTube',
+      viewSource: 'Post Instagram',
+      privacy: 'Visibilité YouTube',
+      privacyPrivate: 'Privée',
+      privacyUnlisted: 'Non répertoriée',
+      privacyPublic: 'Publique',
+      titleStyle: 'Titre et description',
+      styleAi: 'Réécrits par Claude (SEO YouTube)',
+      styleCaption: 'Légende Instagram telle quelle',
+      shortsLabel: 'Ajouter #Shorts au titre',
+      autoLabel: 'Repost auto chaque matin',
+      maxPerRun: 'Vidéos par run auto',
+      saved: 'Réglages enregistrés',
+      lastScan: (when: string) => `Dernière lecture Instagram : ${when}`,
+      lastRun: (when: string) => `Dernier repost : ${when}`,
+      viewsLabel: 'vues',
+      historyTitle: 'Déjà republié',
+      historyEmpty: 'Rien encore publié sur YouTube.',
+      running: 'Repost en cours — tu peux quitter l’onglet, ça continue côté serveur.',
+      copyrightNote:
+        'Republie uniquement tes propres vidéos. Une musique protégée dans un Reel peut déclencher une revendication Content ID sur YouTube.',
+    },
 
     dnaKicker: 'ADN de marque',
     dnaTitle: 'Apprends à Zack la voix de ta marque',
@@ -604,6 +702,7 @@ const en: Copy = {
     photos: 'Product',
     script: 'Script',
     calendrier: 'Calendar',
+    repost: 'Repost',
     chat: 'Zack',
   },
 
@@ -641,6 +740,55 @@ const en: Copy = {
     errRemake: 'remake failed',
     errShorten: 'shortening failed',
     errVeille: 'scan failed',
+    errRepost: 'repost failed',
+
+    repost: {
+      kicker: 'Instagram → YouTube',
+      title: 'Repost your Instagram content to your YouTube channel.',
+      body:
+        'Zack reads your Instagram account, pulls the videos, rewrites title and description for YouTube, then uploads them as Shorts. Each post is published only once.',
+      sourceLabel: 'Source Instagram account',
+      sourcePlaceholder: 'fredjoclothing.paris',
+      connectTitle: 'YouTube channel',
+      connectBody: 'Connect the channel that will receive the videos. Zack only asks for upload rights.',
+      connect: 'Connect YouTube',
+      connectedTo: (channel: string) => `Connected to ${channel}`,
+      disconnect: 'Disconnect',
+      notConfigured:
+        'Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (Google Cloud → OAuth) to enable publishing.',
+      scan: 'Read my Instagram',
+      scanning: 'Reading Instagram…',
+      publish: (n: number) => (n <= 1 ? 'Publish to YouTube' : `Publish ${n} videos to YouTube`),
+      publishing: 'Uploading to YouTube…',
+      selectAll: 'Select all',
+      clearSelection: 'Clear selection',
+      noApify: 'APIFY_TOKEN missing — Zack cannot read Instagram.',
+      empty: 'No video pulled yet.',
+      emptyHint: 'Run “Read my Instagram” to load your latest posts.',
+      alreadyPosted: 'Already on YouTube',
+      photoOnly: 'Photo — no video to repost',
+      watchOnYoutube: 'Watch on YouTube',
+      viewSource: 'Instagram post',
+      privacy: 'YouTube visibility',
+      privacyPrivate: 'Private',
+      privacyUnlisted: 'Unlisted',
+      privacyPublic: 'Public',
+      titleStyle: 'Title and description',
+      styleAi: 'Rewritten by Claude (YouTube SEO)',
+      styleCaption: 'Instagram caption as is',
+      shortsLabel: 'Append #Shorts to the title',
+      autoLabel: 'Auto repost every morning',
+      maxPerRun: 'Videos per auto run',
+      saved: 'Settings saved',
+      lastScan: (when: string) => `Last Instagram read: ${when}`,
+      lastRun: (when: string) => `Last repost: ${when}`,
+      viewsLabel: 'views',
+      historyTitle: 'Already reposted',
+      historyEmpty: 'Nothing published to YouTube yet.',
+      running: 'Repost running — you can leave this tab, it keeps going server-side.',
+      copyrightNote:
+        'Only repost your own videos. Licensed music inside a Reel can trigger a Content ID claim on YouTube.',
+    },
 
     dnaKicker: 'Brand DNA',
     dnaTitle: 'Teach Zack your brand voice',

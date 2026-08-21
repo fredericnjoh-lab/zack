@@ -5,11 +5,16 @@ import type {
   GeneratedScript,
   PhotoRemake,
   ProfileAnalysis,
+  RepostCandidate,
+  RepostJob,
+  RepostSettings,
+  RepostedItem,
   ScoredReel,
   StatusPayload,
   Transcription,
   VeilleJob,
   WritingGuide,
+  YoutubeStatus,
 } from '../types'
 import type { Lang } from './i18n'
 
@@ -182,6 +187,39 @@ export const zackApi = {
     api<{ writingGuide: WritingGuide }>(`/api/writing/documents/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
+  repost: () =>
+    api<{
+      settings: RepostSettings
+      candidates: RepostCandidate[]
+      published: RepostedItem[]
+      youtube: YoutubeStatus
+      apify: boolean
+      llm: string
+      job: RepostJob
+    }>('/api/repost', { retries: 3 }),
+  repostJob: () => api<{ job: RepostJob }>('/api/repost/job', { retries: 2 }),
+  setRepostSettings: (payload: Partial<RepostSettings>) =>
+    api<{ settings: RepostSettings }>('/api/repost/settings', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      retries: 2,
+    }),
+  scanRepost: (handle?: string) =>
+    api<{ started: boolean; job: RepostJob }>('/api/repost/scan', {
+      method: 'POST',
+      body: JSON.stringify(handle ? { handle } : {}),
+      retries: 2,
+    }),
+  publishRepost: (sourceIds: string[], lang: Lang = 'fr') =>
+    api<{ started: boolean; job: RepostJob }>('/api/repost/publish', {
+      method: 'POST',
+      body: JSON.stringify({ sourceIds, lang }),
+      retries: 1,
+    }),
+  youtubeStatus: () => api<YoutubeStatus>('/api/youtube/status', { retries: 2 }),
+  youtubeAuthUrl: () => api<{ url: string; redirectUri: string }>('/api/youtube/auth-url'),
+  youtubeDisconnect: () =>
+    api<{ connected: boolean }>('/api/youtube/disconnect', { method: 'POST', body: '{}' }),
   chat: (message: string, lang: Lang = 'fr') =>
     api<{
       reply: string

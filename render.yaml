@@ -20,3 +20,15 @@ services:
         value: claude-sonnet-4-5
       - key: CRON_SECRET
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REFRESH_TOKEN
+        sync: false
+      - key: IG_SOURCE_HANDLE
+        value: fredjoclothing.paris
+      - key: YOUTUBE_HANDLE
+        value: fredjoclothing
+      - key: YOUTUBE_PRIVACY
+        value: private

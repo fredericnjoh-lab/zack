@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { zackApi } from '../lib/api'
 import { dict, type Lang } from '../lib/i18n'
+import { RepostPanel } from './RepostPanel'
 import { LangToggle } from './StickyHeader'
 import type {
   AutoVeilleSettings,
@@ -15,7 +16,7 @@ import type {
   WritingGuide,
 } from '../types'
 
-type Tab = 'profil' | 'veille' | 'photos' | 'script' | 'calendrier' | 'chat'
+type Tab = 'profil' | 'veille' | 'photos' | 'script' | 'calendrier' | 'repost' | 'chat'
 type ChatMessage = { from: 'zack' | 'user'; text: string }
 type AppCopy = (typeof dict)['fr']['app']
 
@@ -195,6 +196,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
           [result.transcription!.reelId]: result.transcription!,
         }))
       }
+      if (result.actions?.includes('repost_run')) setTab('repost')
       if (result.actions?.includes('calendar_idea') || result.actions?.includes('veille_run')) {
         await refresh()
       }
@@ -248,7 +250,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
         </div>
       )}
 
-      <nav className="tabs tabs-6" aria-label="Zack">
+      <nav className="tabs tabs-7" aria-label="Zack">
         {(
           [
             ['profil', t.tabs.profil],
@@ -256,6 +258,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
             ['photos', t.tabs.photos],
             ['script', t.tabs.script],
             ['calendrier', t.tabs.calendrier],
+            ['repost', t.tabs.repost],
             ['chat', t.tabs.chat],
           ] as const
         ).map(([id, label]) => (
@@ -497,6 +500,8 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
           }}
         />
       )}
+
+      {tab === 'repost' && <RepostPanel lang={lang} />}
 
       {tab === 'chat' && (
         <section className="panel chat">

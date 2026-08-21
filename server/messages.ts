@@ -34,6 +34,10 @@ const messages = {
       `Idée « ${label} » ajoutée dans la boîte à idées de l’Agenda — glisse-la sur un jour.`,
     chatHelp: ({ accounts, hits, apify, llm }: Vars) =>
       `Je peux agir. Essaie : « lance une veille », « montre-moi les meilleurs », « raccourcis mon accroche », « découvre des marques », « transcris », « retenir : … », « planifie … ». État : ${accounts} marques · ${hits} exceptions · Apify ${apify} · LLM ${llm}.`,
+    chatRepostStarted: ({ handle, n }: Vars) =>
+      `Repost lancé : je republie ${n} vidéo(s) de @${handle} sur YouTube. L’onglet Repost suit l’avancement.`,
+    chatRepostBusy: 'Un repost tourne déjà. Je te préviens quand c’est publié.',
+    chatRepostFail: ({ err }: Vars) => `Repost impossible : ${err}`,
     ideaFallback: 'Idée Zack',
     privateAccount: ({ handle }: Vars) =>
       `Aucune publication récupérée pour @${handle}. Vérifie l’orthographe et que le compte est public (Zack ne peut pas lire un compte privé).`,
@@ -68,6 +72,10 @@ const messages = {
       `Idea “${label}” added to the Calendar inbox — drag it onto a day.`,
     chatHelp: ({ accounts, hits, apify, llm }: Vars) =>
       `I can act. Try: “run a scan”, “show me the best”, “shorten my hook”, “discover brands”, “transcribe”, “save: …”, “schedule …”. State: ${accounts} brands · ${hits} outliers · Apify ${apify} · LLM ${llm}.`,
+    chatRepostStarted: ({ handle, n }: Vars) =>
+      `Repost started: pushing ${n} video(s) from @${handle} to YouTube. The Repost tab tracks progress.`,
+    chatRepostBusy: 'A repost is already running. I’ll tell you when it lands.',
+    chatRepostFail: ({ err }: Vars) => `Cannot repost: ${err}`,
     ideaFallback: 'Zack idea',
     privateAccount: ({ handle }: Vars) =>
       `No posts retrieved for @${handle}. Check the spelling and that the account is public (Zack cannot read a private account).`,

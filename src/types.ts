@@ -129,3 +129,73 @@ export type StatusPayload = {
   lastVeilleAt?: string
   lastVeilleMode?: string
 }
+
+export type RepostPrivacy = 'private' | 'unlisted' | 'public'
+
+export type RepostCandidate = {
+  id: string
+  shortCode?: string
+  handle: string
+  url?: string
+  caption?: string
+  videoUrl?: string
+  thumbnailUrl?: string
+  durationSec?: number
+  takenAt?: string
+  views?: number
+  likes?: number
+  comments?: number
+  mediaType: MediaType
+  alreadyPosted?: boolean
+  youtubeUrl?: string
+}
+
+export type RepostedItem = {
+  id: string
+  sourceId: string
+  shortCode?: string
+  handle: string
+  sourceUrl?: string
+  thumbnailUrl?: string
+  youtubeVideoId: string
+  youtubeUrl: string
+  title: string
+  description: string
+  tags: string[]
+  privacyStatus: RepostPrivacy
+  postedAt: string
+}
+
+export type RepostSettings = {
+  sourceHandle: string
+  youtubeHandle?: string
+  privacyStatus: RepostPrivacy
+  autoEnabled: boolean
+  maxPerRun: number
+  titleStyle: 'caption' | 'ai'
+  extraTags: string[]
+  markAsShorts: boolean
+  lastScanAt?: string
+  lastRunAt?: string
+}
+
+export type RepostJob = {
+  kind?: 'scan' | 'publish'
+  status: 'idle' | 'running' | 'ok' | 'error'
+  startedAt?: string
+  finishedAt?: string
+  total?: number
+  done?: number
+  published?: RepostedItem[]
+  errors?: { sourceId: string; message: string }[]
+  error?: string
+  summary?: string
+}
+
+export type YoutubeStatus = {
+  configured: boolean
+  connected: boolean
+  channel: { id: string; title: string; customUrl?: string } | null
+  redirectUri?: string
+  fromEnv?: boolean
+}

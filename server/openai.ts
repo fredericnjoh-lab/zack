@@ -1,5 +1,6 @@
 import type {
   DiscoveredAccount,
+  RepostCandidate,
   GeneratedScript,
   PhotoRemake,
   ProfileAnalysis,
@@ -699,4 +700,84 @@ function formatViews(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${Math.round(n / 1_000)}k`
   return String(n)
+}
+
+export type YoutubeMetadata = { title: string; description: string; tags: string[] }
+
+/** Nettoie une légende Instagram pour en tirer un titre lisible. */
+function captionTitle(caption: string, fallback: string): string {
+  const strip = (line: string) =>
+    line
+      .replace(/#[\p{L}\p{N}_]+/gu, '')
+      .replace(/@[\w.]+/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  // Une légende commence souvent par des hashtags : on garde la première ligne
+  // qui dit encore quelque chose une fois les # et @ retirés.
+  const clean = caption.split('\n').map(strip).find(Boolean) || strip(caption)
+  return (clean || fallback).slice(0, 95)
+}
+
+function captionTags(caption: string): string[] {
+  const found = caption.match(/#[\p{L}\p{N}_]+/gu) || []
+  return [...new Set(found.map((t) => t.slice(1).toLowerCase()))].slice(0, 15)
+}
+
+export function localYoutubeMetadata(
+  media: RepostCandidate,
+  handle: string,
+  lang: Lang = 'fr',
+): YoutubeMetadata {
+  const title = captionTitle(media.caption || '', lang === 'fr' ? 'Nouvelle pièce' : 'New drop')
+  const credit =
+    lang === 'fr'
+      ? `Publié à l’origine sur Instagram @${handle}`
+      : `Originally posted on Instagram @${handle}`
+  const description = [(media.caption || '').trim(), [credit, media.url ? `→ ${media.url}` : '']
+    .filter(Boolean)
+    .join('\n')]
+    .filter(Boolean)
+    .join('\n\n')
+  return { title, description, tags: captionTags(media.caption || '') }
+}
+
+/** Titre + description + tags optimisés YouTube à partir du post Instagram. */
+export async function generateYoutubeMetadata(
+  media: RepostCandidate,
+  handle: string,
+  extras?: { writingContext?: string; lang?: Lang },
+): Promise<YoutubeMetadata> {
+  const lang: Lang = extras?.lang || 'fr'
+  const fallback = localYoutubeMetadata(media, handle, lang)
+  const provider = llmProvider()
+  if (provider === 'local') return fallback
+
+  const prompt = [
+    lang === 'fr'
+      ? `Tu prépares la republication d'un Reel Instagram de la marque @${handle} en Short YouTube.`
+      : `You are repurposing an Instagram Reel from the brand @${handle} into a YouTube Short.`,
+    `Légende Instagram: ${(media.caption || '(vide)').slice(0, 900)}`,
+    media.views ? `Vues Instagram: ${media.views}` : '',
+    extras?.writingContext ? `Contexte de marque:\n${extras.writingContext.slice(0, 1500)}` : '',
+    lang === 'fr'
+      ? 'Rends UNIQUEMENT ce JSON: {"title": "titre YouTube accrocheur < 90 caractères, sans hashtag", "description": "3 à 5 lignes, ton de la marque, finir par un appel à l’action", "tags": ["10 mots-clés YouTube en minuscules, sans #"]}'
+      : 'Return ONLY this JSON: {"title": "catchy YouTube title < 90 chars, no hashtag", "description": "3-5 lines in brand voice, end with a call to action", "tags": ["10 lowercase YouTube keywords, no #"]}',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  try {
+    const content = provider === 'claude' ? await callClaude(prompt, lang) : await callOpenAI(prompt, lang)
+    const parsed = JSON.parse(content.replace(/```json|```/g, '').trim()) as Partial<YoutubeMetadata>
+    const tags = Array.isArray(parsed.tags)
+      ? parsed.tags.map((t) => String(t).replace(/^#/, '').trim()).filter(Boolean)
+      : []
+    return {
+      title: (parsed.title || fallback.title).slice(0, 95),
+      description: parsed.description || fallback.description,
+      tags: [...new Set([...tags, ...fallback.tags])].slice(0, 20),
+    }
+  } catch {
+    return fallback
+  }
 }

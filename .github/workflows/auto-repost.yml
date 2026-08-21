@@ -1,0 +1,58 @@
+name: Zack daily Instagram → YouTube repost
+
+# Réveille Render puis republie les derniers Reels Instagram sur YouTube.
+# Ne fait rien tant que « Repost auto » est désactivé dans l'onglet Repost.
+# Schedule en UTC — 06:30 UTC ≈ 08:30 Europe/Paris (07:30 en hiver).
+
+on:
+  schedule:
+    - cron: '30 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  auto-repost:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake Render + start async repost
+        env:
+          ZACK_URL: ${{ secrets.ZACK_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          BASE="${ZACK_URL:-https://zack-n0zd.onrender.com}"
+          BASE="${BASE%/}"
+          echo "Pinging $BASE …"
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 30 "$BASE/api/health" >/tmp/zack-health.json; then
+              echo "Health OK"
+              break
+            fi
+            echo "Wake attempt $i failed — retrying…"
+            sleep 10
+          done
+          HDR=(-H "content-type: application/json")
+          if [ -n "${CRON_SECRET:-}" ]; then
+            HDR+=(-H "x-cron-secret: ${CRON_SECRET}")
+          fi
+          curl -fsS --max-time 60 -X POST "$BASE/api/cron/repost" "${HDR[@]}" -d '{}' | tee /tmp/zack-repost.json
+          echo
+          STARTED=$(python3 -c "import json; print(json.load(open('/tmp/zack-repost.json')).get('started'))")
+          if [ "$STARTED" != "True" ]; then
+            echo "Repost auto désactivé ou déjà en cours — rien à attendre."
+            exit 0
+          fi
+          # Scrape + upload : compter quelques minutes
+          for i in $(seq 1 60); do
+            sleep 10
+            curl -fsS --max-time 30 "$BASE/api/repost/job" >/tmp/zack-job.json || continue
+            STATUS=$(python3 -c "import json; print(json.load(open('/tmp/zack-job.json'))['job']['status'])")
+            echo "job status=$STATUS"
+            if [ "$STATUS" = "ok" ] || [ "$STATUS" = "error" ]; then
+              cat /tmp/zack-job.json
+              if [ "$STATUS" = "error" ]; then exit 1; fi
+              exit 0
+            fi
+          done
+          echo "Timed out waiting for repost job"
+          cat /tmp/zack-job.json || true
+          exit 1
