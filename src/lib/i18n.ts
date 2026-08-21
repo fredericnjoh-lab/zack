@@ -145,6 +145,9 @@ type AppCopy = {
   viralScore: string
   thumbAlt: (handle: string) => string
   postAlt: (handle: string) => string
+  openPost: (handle: string) => string
+  openProfile: (handle: string) => string
+  sourcePost: string
 
   productTitle: string
   productBody: string
@@ -425,6 +428,9 @@ const fr: Copy = {
     viralScore: 'score viral',
     thumbAlt: (handle) => `Miniature @${handle}`,
     postAlt: (handle) => `Publication @${handle}`,
+    openPost: (handle) => `Ouvrir la publication de @${handle} sur Instagram`,
+    openProfile: (handle) => `Ouvrir le profil Instagram de @${handle}`,
+    sourcePost: 'Publication source',
 
     productTitle: 'Photos & carrousels produit',
     productBody:
@@ -708,6 +714,9 @@ const en: Copy = {
     viralScore: 'viral score',
     thumbAlt: (handle) => `Thumbnail @${handle}`,
     postAlt: (handle) => `Post @${handle}`,
+    openPost: (handle) => `Open @${handle}’s post on Instagram`,
+    openProfile: (handle) => `Open @${handle}’s Instagram profile`,
+    sourcePost: 'Source post',
 
     productTitle: 'Product photos & carousels',
     productBody:
