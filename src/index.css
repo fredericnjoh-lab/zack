@@ -1,12 +1,12 @@
 :root {
-  --bg: #0b0b10;
-  --bg-soft: rgba(255, 255, 255, 0.035);
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-strong: rgba(255, 255, 255, 0.085);
-  --ink: #f4f1ea;
-  --muted: rgba(244, 241, 234, 0.6);
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
+  --bg: #120e1c;
+  --bg-soft: rgba(255, 255, 255, 0.045);
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-strong: rgba(255, 255, 255, 0.1);
+  --ink: #f7f4ee;
+  --muted: rgba(247, 244, 238, 0.64);
+  --line: rgba(255, 255, 255, 0.15);
+  --line-strong: rgba(255, 255, 255, 0.27);
 
   /* Signal palette: one hot accent, two status supports */
   --accent: #ff4d1c;
@@ -16,6 +16,14 @@
   --accent-wash: rgba(255, 77, 28, 0.08);
   --accent-line: rgba(255, 77, 28, 0.45);
   --grad: linear-gradient(180deg, #ffffff 0%, #d9d5cd 100%);
+
+  /* Backdrop palette: keeps the page alive without touching the signal accent */
+  --joy-orange: #ff5a1f;
+  --joy-pink: #ff2e88;
+  --joy-violet: #8b5cf6;
+  --joy-cyan: #22d3ee;
+  --joy-mint: #7cf2c0;
+  --joy-amber: #ffc247;
 
   --blue: #ff7a4d;
   --blue-deep: rgba(255, 77, 28, 0.85);
@@ -69,16 +77,31 @@ body::before {
   background-size: 88px 88px;
 }
 
-/* Warm bloom so the page never reads as flat black */
+/* Colour field: several blooms drifting so the page never reads as flat black */
 body::after {
   content: '';
   position: fixed;
-  inset: 0;
+  inset: -12vmax;
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(70vw 55vh at 8% -10%, rgba(255, 77, 28, 0.16), transparent 62%),
-    radial-gradient(55vw 45vh at 100% 108%, rgba(124, 242, 192, 0.09), transparent 60%);
+    radial-gradient(46vw 42vh at 6% 2%, rgba(255, 90, 31, 0.42), transparent 63%),
+    radial-gradient(40vw 38vh at 92% 6%, rgba(255, 46, 136, 0.34), transparent 62%),
+    radial-gradient(52vw 46vh at 78% 52%, rgba(139, 92, 246, 0.34), transparent 64%),
+    radial-gradient(42vw 40vh at 14% 62%, rgba(34, 211, 238, 0.24), transparent 62%),
+    radial-gradient(46vw 42vh at 50% 100%, rgba(124, 242, 192, 0.26), transparent 62%),
+    radial-gradient(34vw 34vh at 34% 30%, rgba(255, 194, 71, 0.2), transparent 60%);
+  filter: blur(28px) saturate(122%);
+  animation: joy-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes joy-drift {
+  from {
+    transform: translate3d(-1.4%, -1%, 0) scale(1.02);
+  }
+  to {
+    transform: translate3d(1.6%, 1.4%, 0) scale(1.09);
+  }
 }
 
 button,
@@ -1293,9 +1316,11 @@ button.pill:hover {
   inset: 0;
   z-index: 1;
   background:
-    radial-gradient(80vw 60vh at 12% 100%, rgba(255, 77, 28, 0.28), transparent 58%),
-    linear-gradient(180deg, rgba(8, 8, 12, 0.3) 0%, rgba(8, 8, 12, 0.18) 40%, rgba(11, 11, 16, 0.92) 100%),
-    linear-gradient(90deg, rgba(11, 11, 16, 0.55) 0%, transparent 55%);
+    radial-gradient(72vw 56vh at 10% 100%, rgba(255, 90, 31, 0.44), transparent 60%),
+    radial-gradient(56vw 46vh at 88% 14%, rgba(255, 46, 136, 0.3), transparent 62%),
+    radial-gradient(60vw 50vh at 62% 88%, rgba(139, 92, 246, 0.3), transparent 62%),
+    linear-gradient(180deg, rgba(14, 10, 22, 0.24) 0%, rgba(14, 10, 22, 0.14) 40%, rgba(18, 14, 28, 0.9) 100%),
+    linear-gradient(90deg, rgba(18, 14, 28, 0.5) 0%, transparent 55%);
 }
 
 .landing-hero-copy {
@@ -1409,6 +1434,43 @@ button.pill:hover {
   line-height: 1.65;
 }
 
+/* Each section carries its own hue so scrolling changes mood */
+.landing-block {
+  position: relative;
+  isolation: isolate;
+}
+
+.landing-block::before {
+  content: '';
+  position: absolute;
+  inset: -14% -28%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.product-proof::before {
+  background: radial-gradient(46% 52% at 78% 18%, rgba(255, 90, 31, 0.3), transparent 68%);
+}
+
+.use-cases::before {
+  background:
+    radial-gradient(42% 48% at 12% 16%, rgba(255, 46, 136, 0.26), transparent 66%),
+    radial-gradient(46% 52% at 88% 74%, rgba(34, 211, 238, 0.22), transparent 68%);
+}
+
+.editorial-story::before {
+  background:
+    radial-gradient(44% 50% at 18% 30%, rgba(139, 92, 246, 0.3), transparent 66%),
+    radial-gradient(40% 46% at 84% 78%, rgba(255, 194, 71, 0.22), transparent 66%);
+}
+
+.landing-end::before {
+  background:
+    radial-gradient(48% 56% at 50% 92%, rgba(124, 242, 192, 0.26), transparent 66%),
+    radial-gradient(40% 48% at 16% 12%, rgba(255, 90, 31, 0.24), transparent 66%);
+}
+
 /* Product proof — the product appears before the explanation */
 .product-proof {
   display: grid;
@@ -1438,9 +1500,10 @@ button.pill:hover {
   overflow: hidden;
   border: 1px solid var(--line-strong);
   background:
-    linear-gradient(135deg, var(--accent-soft), rgba(124, 242, 192, 0.08)),
-    #101016;
-  box-shadow: 0 34px 110px rgba(0, 0, 0, 0.38);
+    linear-gradient(135deg, rgba(255, 90, 31, 0.22), rgba(139, 92, 246, 0.18) 55%, rgba(124, 242, 192, 0.16)),
+    rgba(18, 14, 28, 0.62);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 34px 110px rgba(6, 2, 16, 0.5);
 }
 
 .product-window-bar {
@@ -1549,8 +1612,10 @@ button.pill:hover {
   min-height: 570px;
   padding: 46px;
   background:
-    radial-gradient(55% 70% at 100% 0%, rgba(255, 77, 28, 0.15), transparent 70%),
-    #111117;
+    radial-gradient(58% 74% at 100% 0%, rgba(255, 90, 31, 0.26), transparent 68%),
+    radial-gradient(52% 68% at 0% 100%, rgba(139, 92, 246, 0.24), transparent 66%),
+    rgba(18, 14, 28, 0.58);
+  backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--line);
 }
 
