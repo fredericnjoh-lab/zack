@@ -2,7 +2,7 @@ name: Deploy Zack to GitHub Pages
 
 on:
   push:
-    branches: [main, cursor/zack-app-8ee8]
+    branches: [main, cursor/zack-app-8ee8, cursor/zack-clickable-instagram-thumbs-094d]
   workflow_dispatch:
 
 permissions:
