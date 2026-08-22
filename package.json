@@ -11,6 +11,7 @@
     "dev:web": "vite",
     "dev:api": "tsx server/index.ts",
     "build": "tsc -b && vite build",
+    "test": "tsx --test server/*.test.ts",
     "preview": "vite preview",
     "start": "tsx server/index.ts"
   },
