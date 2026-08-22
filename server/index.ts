@@ -5,7 +5,15 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { fetchReelsForHandles, hasApify } from './apify.ts'
-import { loadStore, normalizeHandle, saveStore, writingContext } from './db.ts'
+import {
+  flushStoreWrites,
+  getPersistenceStatus,
+  initializeStore,
+  loadStore,
+  normalizeHandle,
+  saveStore,
+  writingContext,
+} from './db.ts'
 import { getVeilleJob, startVeilleJob } from './jobs.ts'
 import {
   analyzeProfile,
@@ -51,6 +59,7 @@ app.get('/api/health', (_req, res) => {
     lastVeilleAt: store.lastVeilleAt,
     lastVeilleMode: store.lastVeilleMode,
     autoVeille: store.autoVeille || { enabled: false, hour: 7 },
+    persistence: getPersistenceStatus(),
   })
 })
 
@@ -754,8 +763,26 @@ if (existsSync(distDir)) {
   })
 }
 
-app.listen(PORT, '0.0.0.0', () => {
+await initializeStore()
+
+const httpServer = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Zack on http://127.0.0.1:${PORT} (app + API)`)
   console.log(`Apify: ${hasApify() ? 'yes' : 'no'} · LLM: ${llmProvider()}`)
   startAutoVeilleLoop()
 })
+
+let shuttingDown = false
+async function shutdown(signal: string) {
+  if (shuttingDown) return
+  shuttingDown = true
+  console.log(`[shutdown] ${signal}; attente des sauvegardes`)
+  const deadline = setTimeout(() => process.exit(1), 12_000)
+  deadline.unref()
+  httpServer.close()
+  await flushStoreWrites()
+  httpServer.closeAllConnections()
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'))
+process.on('SIGINT', () => void shutdown('SIGINT'))

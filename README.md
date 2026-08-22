@@ -45,13 +45,42 @@ Chaque matin ~7h Paris, GitHub réveille le serveur et lance `POST /api/cron/vei
 3. Ajoute les secrets :
    - `APIFY_TOKEN`
    - `ANTHROPIC_API_KEY`
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
 4. Deploy → URL du type `https://zack-xxxx.onrender.com`
 
 Ou manuellement : **New Web Service** → Build `npm install --include=dev && npm run build` → Start `npm start`.
 
+## Persistance des recherches sur Render Free
+
+Le disque d'une instance Render Free est éphémère. Sans stockage distant, les
+comptes, résultats Apify, scripts et réglages reviennent aux données de démo
+après un redéploiement ou le remplacement de l'instance.
+
+Zack peut sauvegarder automatiquement tout son état dans un Redis Upstash
+(l'offre gratuite suffit pour une instance) :
+
+1. Crée une base Redis sur [console.upstash.com](https://console.upstash.com).
+2. Dans **REST API**, copie `UPSTASH_REDIS_REST_URL` et
+   `UPSTASH_REDIS_REST_TOKEN`.
+3. Ajoute ces deux valeurs dans Render → service **zack** → **Environment**.
+4. Redéploie le service, puis lance une veille.
+
+Au démarrage, Zack restaure la dernière recherche avant d'accepter du trafic.
+Chaque ajout, veille, script ou changement de réglage est ensuite écrit dans le
+fichier local et mis en file pour sauvegarde distante. `/api/health` expose
+`persistence.backend`, `configured`, `restored`, `lastSyncedAt` et `lastError`
+ainsi que `durableWrites` pour diagnostiquer la connexion sans exposer les
+secrets. Si la restauration échoue après trois essais, Zack conserve son cache
+local mais bloque les écritures distantes pour ne jamais écraser une sauvegarde
+valide avec les données de démo.
+
+Sans ces variables, le comportement reste local et l'application continue de
+fonctionner, mais les données ne survivent pas à une nouvelle instance Render.
+
 ## Notes
 
-- Les données (`data/store.json`) sont locales au disque du service (éphémère sur le plan free) : une veille Apify re-remplit tout.
+- `data/store.json` reste le cache local ; Upstash en est la copie durable quand il est configuré.
 - Compte Instagram **privé** = non lisible par Apify.
 - Sur le free tier Render, le process dort : le workflow GitHub **Zack daily auto-veille** appelle `POST /api/cron/veille` chaque matin.
 - Les veilles Apify partent en **async** (plus de timeout proxy « API failed »).
