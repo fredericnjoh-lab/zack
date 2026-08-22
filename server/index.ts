@@ -12,6 +12,7 @@ import {
   loadStore,
   normalizeHandle,
   saveStore,
+  updateStore,
   writingContext,
 } from './db.ts'
 import { getVeilleJob, startVeilleJob } from './jobs.ts'
@@ -229,8 +230,9 @@ app.post('/api/discover', async (req, res) => {
         /* keep unverified */
       }
     }
-    store.discoveries = suggestions
-    saveStore(store)
+    updateStore((latest) => {
+      latest.discoveries = suggestions
+    })
     res.json({ discoveries: suggestions, llm: llmProvider() })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'découverte échouée' })
@@ -353,8 +355,9 @@ app.post('/api/scripts/generate', async (req, res) => {
       transcription,
       lang: pickLang((req.body as { lang?: string })?.lang),
     })
-    store.scripts.unshift(script)
-    saveStore(store)
+    updateStore((latest) => {
+      latest.scripts.unshift(script)
+    })
     res.json({ script, openai: hasLLM(), llm: llmProvider() })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'script failed' })
@@ -371,9 +374,12 @@ app.post('/api/scripts/:id/shorten', async (req, res) => {
       writingContext(store),
       pickLang((req.body as { lang?: string })?.lang),
     )
-    script.beats = beats
-    saveStore(store)
-    res.json({ script, hook, llm: llmProvider() })
+    const saved = updateStore((latest) => {
+      const target = latest.scripts.find((item) => item.id === script.id)
+      if (target) target.beats = beats
+    })
+    const updated = saved.scripts.find((item) => item.id === script.id) || { ...script, beats }
+    res.json({ script: updated, hook, llm: llmProvider() })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'raccourci échoué' })
   }
@@ -424,10 +430,11 @@ app.post('/api/reels/:id/transcribe', async (req, res) => {
       : scoreReels([reel as Reel], 0)[0]!
   try {
     const transcription = await transcribeReel(scored, pickLang((req.body as { lang?: string })?.lang))
-    if (!store.transcriptions) store.transcriptions = []
-    store.transcriptions = store.transcriptions.filter((t) => t.reelId !== scored.id)
-    store.transcriptions.unshift(transcription)
-    saveStore(store)
+    updateStore((latest) => {
+      if (!latest.transcriptions) latest.transcriptions = []
+      latest.transcriptions = latest.transcriptions.filter((item) => item.reelId !== scored.id)
+      latest.transcriptions.unshift(transcription)
+    })
     res.json({ transcription, llm: llmProvider() })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'transcription échouée' })
@@ -544,8 +551,9 @@ app.post('/api/photos/remake', async (req, res) => {
       store.profile,
       pickLang((req.body as { lang?: string })?.lang),
     )
-    store.remakes.unshift(remake)
-    saveStore(store)
+    updateStore((latest) => {
+      latest.remakes.unshift(remake)
+    })
     res.json({ remake, llm: llmProvider() })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'remake failed' })
@@ -644,13 +652,16 @@ app.post('/api/chat', async (req, res) => {
         })
       }
       const { hook, beats } = await shortenHook(script, writingContext(store), lang)
-      script.beats = beats
-      saveStore(store)
+      const saved = updateStore((latest) => {
+        const target = latest.scripts.find((item) => item.id === script.id)
+        if (target) target.beats = beats
+      })
+      const updated = saved.scripts.find((item) => item.id === script.id) || { ...script, beats }
       actions.push('shorten_hook')
       return res.json({
-        reply: m.chatHookDone({ hook, title: script.title }),
+        reply: m.chatHookDone({ hook, title: updated.title }),
         actions,
-        script,
+        script: updated,
       })
     }
 
@@ -669,8 +680,9 @@ app.post('/api/chat', async (req, res) => {
         writingContext(store),
         lang,
       )
-      store.discoveries = discoveries
-      saveStore(store)
+      updateStore((latest) => {
+        latest.discoveries = discoveries
+      })
       actions.push('discover')
       return res.json({
         reply: discoveries.length
@@ -692,10 +704,11 @@ app.post('/api/chat', async (req, res) => {
         return res.json({ reply: m.chatNoReelToTranscribe, actions })
       }
       const transcription = await transcribeReel(top, lang)
-      if (!store.transcriptions) store.transcriptions = []
-      store.transcriptions = store.transcriptions.filter((t) => t.reelId !== top.id)
-      store.transcriptions.unshift(transcription)
-      saveStore(store)
+      updateStore((latest) => {
+        if (!latest.transcriptions) latest.transcriptions = []
+        latest.transcriptions = latest.transcriptions.filter((item) => item.reelId !== top.id)
+        latest.transcriptions.unshift(transcription)
+      })
       actions.push('transcribe')
       return res.json({
         reply: `${m.chatTranscribed({ handle: top.handle, source: transcription.source })}\nOCR: ${transcription.ocrText.slice(0, 120) || '—'}\nA: ${transcription.captions.punchy}\nB: ${transcription.captions.soft}`,

@@ -338,6 +338,18 @@ export function saveStore(store: Store) {
 }
 
 /**
+ * Load → mutate → save without an await in between.
+ * Node is single-threaded, so this keeps concurrent request handlers from
+ * clobbering each other as long as callers do their awaits first.
+ */
+export function updateStore(mutator: (store: Store) => void): Store {
+  const store = loadStore()
+  mutator(store)
+  saveStore(store)
+  return store
+}
+
+/**
  * Restore the last durable snapshot before Express accepts traffic.
  * With no remote configuration Zack keeps its original local-only behavior.
  */
