@@ -3402,11 +3402,12 @@ button.pill:hover {
   .landing-hero-3d {
     min-height: auto;
     padding-top: 124px;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .landing-hero-3d .landing-hero-copy {
     z-index: 3;
+    min-width: 0;
     max-width: 650px;
   }
 
@@ -3415,6 +3416,7 @@ button.pill:hover {
   }
 
   .hero-scene-wrap {
+    min-width: 0;
     width: min(650px, 100%);
     height: 580px;
     justify-self: center;
@@ -3468,7 +3470,8 @@ button.pill:hover {
   }
 
   .landing-hero-3d .landing-brand {
-    font-size: clamp(5rem, 28vw, 7.4rem);
+    font-size: clamp(4.7rem, 25vw, 6.2rem);
+    letter-spacing: -0.1em;
   }
 
   .landing-hero-3d .landing-hero-copy h1 {
@@ -3490,11 +3493,12 @@ button.pill:hover {
   }
 
   .hero-proof strong {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
   }
 
   .hero-proof span {
     font-size: 0.5rem;
+    letter-spacing: 0.06em;
   }
 
   .hero-scene-wrap {
