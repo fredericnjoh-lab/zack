@@ -13,6 +13,7 @@ import {
   fashionSystem,
   type Lang,
 } from './fashion.ts'
+import { fetchBoundedImage, parseAllowedImageUrl, type BoundedImage } from './image-proxy.ts'
 
 export type LlmProvider = 'claude' | 'openai' | 'local'
 
@@ -72,7 +73,11 @@ export async function transcribeReel(reel: ScoredReel, lang: Lang = 'fr'): Promi
   let ocrFromVision = ''
   if (reel.imageUrl && provider === 'claude') {
     try {
-      ocrFromVision = await ocrFrameWithClaude(reel.imageUrl)
+      const imageUrl = parseAllowedImageUrl(reel.imageUrl)
+      if (imageUrl) {
+        const fetched = await fetchBoundedImage(imageUrl)
+        if ('bytes' in fetched) ocrFromVision = await ocrFrameWithClaude(fetched)
+      }
     } catch {
       ocrFromVision = ''
     }
@@ -212,14 +217,11 @@ Réponds UNIQUEMENT en JSON:
   return { hook, beats }
 }
 
-async function ocrFrameWithClaude(imageUrl: string): Promise<string> {
+async function ocrFrameWithClaude(image: BoundedImage): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || ''
   const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5'
-  const upstream = await fetch(imageUrl, { headers: { 'user-agent': 'Mozilla/5.0' } })
-  if (!upstream.ok) throw new Error('image fetch failed')
-  const buf = Buffer.from(await upstream.arrayBuffer())
-  if (buf.byteLength > 4_500_000) throw new Error('image too large')
-  const contentType = upstream.headers.get('content-type') || 'image/jpeg'
+  const buf = image.bytes
+  const contentType = image.contentType
   const mediaType = contentType.includes('png')
     ? 'image/png'
     : contentType.includes('webp')
