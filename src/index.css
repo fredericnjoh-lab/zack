@@ -2552,33 +2552,26 @@ button.pill:hover {
   height: 315px;
   overflow: hidden;
   border-radius: 16px;
-  background:
-    radial-gradient(circle at 68% 28%, rgba(255, 210, 151, 0.72), transparent 4%),
-    linear-gradient(145deg, #ff6d3d 0 34%, #e7c5fe 34% 62%, #42d7c3 62%);
+  background: #28182e;
 }
 
-.scene-fashion::before,
 .scene-fashion::after {
   content: '';
   position: absolute;
-  border-radius: 50%;
-  filter: blur(1px);
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(17, 8, 28, 0.02) 35%, rgba(17, 8, 28, 0.74) 100%),
+    linear-gradient(115deg, rgba(255, 77, 28, 0.25), transparent 48%);
 }
 
-.scene-fashion::before {
-  left: -45px;
-  top: 74px;
-  width: 160px;
-  height: 160px;
-  background: #ffc247;
-}
-
-.scene-fashion::after {
-  right: -55px;
-  bottom: -28px;
-  width: 180px;
-  height: 180px;
-  background: #8b5cf6;
+.scene-fashion img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 28%;
+  filter: saturate(1.08) contrast(1.04);
+  transform: scale(1.02);
 }
 
 .scene-fashion-copy {
@@ -2591,20 +2584,6 @@ button.pill:hover {
   font-weight: 800;
   line-height: 0.8;
   letter-spacing: -0.08em;
-}
-
-.scene-model {
-  position: absolute;
-  z-index: 2;
-  right: 24px;
-  bottom: -18px;
-  width: 94px;
-  height: 244px;
-  border-radius: 50px 50px 14px 14px;
-  background:
-    radial-gradient(circle at 50% 12%, #1a1129 0 19px, transparent 20px),
-    linear-gradient(90deg, transparent 0 21px, #16101f 22px 70px, transparent 71px);
-  transform: rotate(-7deg);
 }
 
 .scene-card-bottom {
@@ -2945,17 +2924,19 @@ button.pill:hover {
 .radar-thumb::after {
   content: '';
   position: absolute;
-  right: -12px;
-  bottom: -8px;
-  width: 42px;
-  height: 70px;
-  border-radius: 24px 24px 5px 5px;
-  background: rgba(13, 9, 21, 0.72);
-  transform: rotate(12deg);
+  inset: 0;
+  background: linear-gradient(180deg, transparent 44%, rgba(5, 2, 10, 0.68));
 }
 
-.radar-thumb-2 { background: linear-gradient(145deg, #22d3ee, #192640 52%, #ffc247); }
-.radar-thumb-3 { background: linear-gradient(145deg, #ff2e88, #652fbc 58%, #ff9f80); }
+.radar-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.radar-thumb-1 img { object-position: 52% 28%; }
+.radar-thumb-2 img { object-position: 52% 32%; }
+.radar-thumb-3 img { object-position: 50% 24%; }
 
 .radar-thumb i {
   position: absolute;
@@ -3082,6 +3063,7 @@ button.pill:hover {
     radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.14), transparent 5%),
     linear-gradient(135deg, rgba(255, 77, 28, 0.17), transparent 40%),
     repeating-linear-gradient(90deg, transparent 0 48px, rgba(255, 255, 255, 0.025) 49px 50px);
+  overflow: hidden;
 }
 
 .case-screen-body small {
@@ -3111,6 +3093,19 @@ button.pill:hover {
 .case-lines i:nth-child(2) { width: 54%; }
 .case-lines i:nth-child(3) { width: 63%; }
 
+.case-screen-photo {
+  position: absolute;
+  right: 5%;
+  top: 8%;
+  width: 29%;
+  height: 84%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 13px;
+  object-fit: cover;
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.34);
+  transform: rotate(3deg);
+}
+
 .case-phone {
   position: absolute;
   z-index: 3;
@@ -3139,9 +3134,11 @@ button.pill:hover {
 }
 
 .case-phone-art {
+  position: relative;
   display: grid;
   height: 258px;
   place-items: center;
+  overflow: hidden;
   border-radius: 23px 23px 12px 12px;
   background:
     radial-gradient(circle at 70% 30%, #ffc247 0 15%, transparent 16%),
@@ -3154,8 +3151,26 @@ button.pill:hover {
 .visual-calendar .case-phone-art { background: linear-gradient(145deg, #22d3ee, #8b5cf6 52%, #ff2e88); }
 .visual-brand .case-phone-art { background: linear-gradient(145deg, #e7c5fe, #ff729e 48%, #ff7b48); }
 
+.case-phone-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(12, 7, 20, 0.04) 38%, rgba(12, 7, 20, 0.72) 100%);
+}
+
+.case-phone-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .case-phone-art b {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 18px;
   max-width: 90%;
+  transform: translateX(-50%);
   color: rgba(255, 255, 255, 0.9);
   font-family: var(--font-display);
   font-size: 1.15rem;
@@ -3232,30 +3247,23 @@ button.pill:hover {
   padding: 38px;
 }
 
-.editorial-art::before,
 .editorial-art::after {
   content: '';
   position: absolute;
-  border-radius: 50%;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(20, 8, 28, 0.04) 38%, rgba(20, 8, 28, 0.76) 100%),
+    linear-gradient(115deg, rgba(255, 46, 136, 0.18), transparent 48%);
 }
 
-.editorial-art::before {
-  right: -18%;
-  top: 10%;
-  width: 70%;
-  aspect-ratio: 1;
-  background: #ffc247;
-  box-shadow: -100px 200px 0 #22d3ee;
-}
-
-.editorial-art::after {
-  left: 32%;
-  bottom: -18%;
-  width: 38%;
-  height: 76%;
-  border-radius: 45% 45% 12% 12%;
-  background: #130d1f;
-  transform: rotate(12deg);
+.editorial-art > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 24%;
 }
 
 .editorial-art span {
@@ -3303,19 +3311,45 @@ button.pill:hover {
 }
 
 .editorial-card-inner {
+  position: relative;
   display: grid;
   height: 100%;
   align-content: space-between;
+  overflow: hidden;
   padding: 24px;
 }
 
+.editorial-card-inner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(18, 12, 16, 0.08), rgba(18, 12, 16, 0.72));
+}
+
+.editorial-card-inner > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 25%;
+}
+
 .editorial-card-inner small {
+  position: relative;
+  z-index: 2;
+  color: #fff;
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.13em;
 }
 
 .editorial-card-inner strong {
+  position: relative;
+  z-index: 2;
+  align-self: end;
+  color: #fff;
   font-family: var(--font-display);
   font-size: clamp(1.25rem, 2.5vw, 2.1rem);
   line-height: 0.86;
@@ -3323,7 +3357,10 @@ button.pill:hover {
 }
 
 .editorial-card-inner span {
+  position: relative;
+  z-index: 2;
   justify-self: end;
+  color: #fff;
   font-size: 1.8rem;
 }
 
