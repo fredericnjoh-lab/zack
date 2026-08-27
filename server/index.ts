@@ -14,6 +14,7 @@ import {
   saveStore,
   writingContext,
 } from './db.ts'
+import { fetchBoundedImage, parseAllowedImageUrl } from './image-proxy.ts'
 import { getVeilleJob, startVeilleJob } from './jobs.ts'
 import {
   analyzeProfile,
@@ -514,20 +515,16 @@ app.post('/api/profile/analyze', async (req, res) => {
 
 app.get('/api/image', async (req, res) => {
   const raw = typeof req.query.url === 'string' ? req.query.url : ''
+  const url = parseAllowedImageUrl(raw)
+  if (!url) return res.status(400).end()
   try {
-    const url = new URL(raw)
-    const allowed = ['cdninstagram.com', 'fbcdn.net'].some(
-      (domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`),
-    )
-    if (url.protocol !== 'https:' || !allowed) return res.status(400).end()
-    const upstream = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } })
-    if (!upstream.ok || !upstream.body) return res.status(502).end()
-    res.setHeader('content-type', upstream.headers.get('content-type') || 'image/jpeg')
+    const result = await fetchBoundedImage(url)
+    if ('status' in result) return res.status(result.status).end()
+    res.setHeader('content-type', result.contentType)
     res.setHeader('cache-control', 'public, max-age=3600')
-    const bytes = Buffer.from(await upstream.arrayBuffer())
-    res.send(bytes)
+    res.send(result.bytes)
   } catch {
-    res.status(400).end()
+    res.status(502).end()
   }
 })
 
