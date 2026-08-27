@@ -10,6 +10,16 @@ export function Landing({ onTry, lang }: LandingProps) {
   const t = dict[lang]
   const [activeUseCase, setActiveUseCase] = useState(t.useCases[0].id)
   const active = t.useCases.find((item) => item.id === activeUseCase) || t.useCases[0]
+  const asset = (path: string) =>
+    new URL(path, new URL(import.meta.env.BASE_URL, window.location.origin)).toString()
+  const useCasePhotos: Record<string, string> = {
+    radar: 'zack-editorial-orange.webp',
+    product: 'zack-editorial-yellow.webp',
+    script: 'zack-editorial-cyan.webp',
+    calendar: 'zack-editorial-pink.webp',
+    brand: 'zack-editorial-orange.webp',
+  }
+  const activePhoto = asset(useCasePhotos[active.id] || useCasePhotos.radar)
 
   function tiltScene(event: PointerEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect()
@@ -82,8 +92,8 @@ export function Landing({ onTry, lang }: LandingProps) {
                 <i>•••</i>
               </div>
               <div className="scene-fashion">
+                <img src={asset('zack-editorial-orange.webp')} alt="" fetchPriority="high" />
                 <span className="scene-fashion-copy">NEW<br />DROP</span>
-                <span className="scene-model" />
               </div>
               <div className="scene-card-bottom">
                 <strong>842k</strong>
@@ -163,12 +173,13 @@ export function Landing({ onTry, lang }: LandingProps) {
               </div>
               <div className="radar-list">
                 {[
-                  ['@atelierlumiere', '842k', '22.1×'],
-                  ['@studio.nord', '291k', '13.8×'],
-                  ['@capucinemode', '118k', '9.8×'],
-                ].map(([handle, views, score], index) => (
+                  ['@atelierlumiere', '842k', '22.1×', 'zack-editorial-orange.webp'],
+                  ['@studio.nord', '291k', '13.8×', 'zack-editorial-cyan.webp'],
+                  ['@capucinemode', '118k', '9.8×', 'zack-editorial-pink.webp'],
+                ].map(([handle, views, score, photo], index) => (
                   <div className="radar-row" key={handle}>
                     <span className={`radar-thumb radar-thumb-${index + 1}`}>
+                      <img src={asset(photo)} alt="" loading="lazy" />
                       <i>{views}</i>
                     </span>
                     <span>
@@ -230,11 +241,15 @@ export function Landing({ onTry, lang }: LandingProps) {
                   <small>{String(t.useCases.findIndex((item) => item.id === active.id) + 1).padStart(2, '0')}</small>
                   <strong>{active.title}</strong>
                   <div className="case-lines"><i /><i /><i /></div>
+                  <img className="case-screen-photo" src={activePhoto} alt="" loading="lazy" />
                 </div>
               </div>
               <div className="case-phone">
                 <span className="case-phone-notch" />
-                <div className="case-phone-art"><b>{active.label}</b></div>
+                <div className="case-phone-art">
+                  <img src={activePhoto} alt="" loading="lazy" />
+                  <b>{active.label}</b>
+                </div>
                 <strong>{active.id === 'radar' ? '22.1×' : 'READY'}</strong>
               </div>
               <div className="case-float-card">
@@ -259,6 +274,7 @@ export function Landing({ onTry, lang }: LandingProps) {
           <div className="editorial-orbit" aria-hidden="true" />
           <figure className="editorial-photo editorial-photo-main" aria-label={t.founderPhotoAlt}>
             <div className="editorial-art">
+              <img src={asset('zack-editorial-pink.webp')} alt="" loading="lazy" />
               <span>DROP<br />SIGNAL</span>
               <i>22.1×</i>
               <b>ZACK®</b>
@@ -266,6 +282,7 @@ export function Landing({ onTry, lang }: LandingProps) {
           </figure>
           <figure className="editorial-photo editorial-photo-secondary" aria-label={t.shootPhotoAlt}>
             <div className="editorial-card-inner">
+              <img src={asset('zack-editorial-yellow.webp')} alt="" loading="lazy" />
               <small>CONTENT / 04</small>
               <strong>FROM<br />SIGNAL<br />TO SHOOT</strong>
               <span>↗</span>
