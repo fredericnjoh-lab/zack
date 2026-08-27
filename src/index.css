@@ -3470,7 +3470,7 @@ button.pill:hover {
   }
 
   .landing-hero-3d .landing-brand {
-    font-size: clamp(4.7rem, 25vw, 6.2rem);
+    font-size: clamp(3.7rem, 20vw, 5.2rem);
     letter-spacing: -0.1em;
   }
 
