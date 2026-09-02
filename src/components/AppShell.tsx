@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { zackApi } from '../lib/api'
 import { dict, type Lang } from '../lib/i18n'
+import { calendarDropPatch, calendarGridPeriod, isOnVisibleGrid } from '../lib/calendar'
 import { instagramTarget, type InstagramRef } from '../lib/instagram'
 import { LangToggle } from './StickyHeader'
 import type {
@@ -531,8 +532,8 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
             const cal = await zackApi.calendar()
             setCalendar(cal.items)
           }}
-          onMove={async (id, day) => {
-            const r = await zackApi.patchCalendar(id, { day })
+          onMove={async (id, day, month, year) => {
+            const r = await zackApi.patchCalendar(id, calendarDropPatch(day, { month, year }))
             setCalendar(r.items)
           }}
           onCycleStatus={async (id, itemStatus) => {
@@ -1218,18 +1219,16 @@ function CalendarPanel({
   c: AppCopy
   items: CalendarItem[]
   onAdd: (day: number, label: string) => void
-  onMove: (id: string, day: number) => void
+  onMove: (id: string, day: number, month: number, year: number) => void
   onCycleStatus: (id: string, status: CalendarItem['status']) => void
 }) {
   const [label, setLabel] = useState('')
-  const now = new Date()
-  const year = items.find((item) => item.day > 0)?.year ?? now.getFullYear()
-  const month = items.find((item) => item.day > 0)?.month ?? now.getMonth() + 1
+  const { month, year } = calendarGridPeriod(items)
   const daysInMonth = new Date(year, month, 0).getDate()
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
   const inbox = items.filter((item) => item.day === 0)
   const byDay = new Map<number, CalendarItem[]>()
-  for (const item of items.filter((x) => x.month === month && x.day > 0)) {
+  for (const item of items.filter((x) => isOnVisibleGrid(x, { month, year }))) {
     const list = byDay.get(item.day) || []
     list.push(item)
     byDay.set(item.day, list)
@@ -1304,7 +1303,7 @@ function CalendarPanel({
                 onDrop={(e) => {
                   e.preventDefault()
                   const id = e.dataTransfer.getData('text/plain')
-                  if (id) onMove(id, d)
+                  if (id) onMove(id, d, month, year)
                 }}
               >
                 <span className="n">{d}</span>
