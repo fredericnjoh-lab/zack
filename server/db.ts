@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { sanitizeProfileAnalysis, sanitizeRemake, sanitizeScript } from './coerce.ts'
 import type { Store } from './types.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -197,6 +198,9 @@ function ensure() {
 
 function normalizeStore(store: Store): Store {
   if (!Array.isArray(store.remakes)) store.remakes = []
+  else store.remakes = store.remakes.map(sanitizeRemake)
+  if (!Array.isArray(store.scripts)) store.scripts = []
+  else store.scripts = store.scripts.map(sanitizeScript)
   if (!Array.isArray(store.transcriptions)) store.transcriptions = []
   if (!Array.isArray(store.discoveries)) store.discoveries = []
   if (
@@ -213,6 +217,7 @@ function normalizeStore(store: Store): Store {
   ) {
     store.autoVeille = { enabled: false, hour: 7 }
   }
+  if (store.profile) store.profile = sanitizeProfileAnalysis(store.profile)
   return store
 }
 
