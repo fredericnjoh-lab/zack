@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -128,6 +128,34 @@ test('does not overwrite a durable snapshot when startup restore fails', async (
   assert.equal(remoteSnapshot, preciousSnapshot)
   assert.equal(commands.filter(([name]) => name === 'SET').length, setCount)
   assert.equal(db.loadStore().accounts.at(-1)?.handle, 'local.only')
+})
+
+test('loadStore repairs a profile whose list fields were saved as strings', async () => {
+  const current = db.loadStore()
+  writeFileSync(
+    join(dataDir, 'store.json'),
+    JSON.stringify({
+      ...current,
+      profile: {
+        handle: 'broken.brand',
+        analyzedAt: '2026-09-16T00:00:00.000Z',
+        postsAnalyzed: 3,
+        voice: 'voix de marque',
+        pillars: 'Produit; Fit',
+        strengths: 'Identité visuelle',
+        opportunities: ['Hook plus clair'],
+        rules: 'Phrases courtes',
+        topFormats: [],
+        posts: [],
+      },
+    }),
+  )
+
+  const repaired = db.loadStore()
+  assert.deepEqual(repaired.profile?.pillars, ['Produit', 'Fit'])
+  assert.deepEqual(repaired.profile?.rules, ['Phrases courtes'])
+  assert.equal(Array.isArray(repaired.profile?.strengths), true)
+  assert.match(db.writingContext(repaired), /Phrases courtes/)
 })
 
 test('keeps the atomic local copy when the remote store is unavailable', async () => {

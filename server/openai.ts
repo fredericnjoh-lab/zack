@@ -1,3 +1,10 @@
+import {
+  asBeats,
+  asCaptions,
+  asRemakeVariant,
+  asStringList,
+  sanitizeProfileAnalysis,
+} from './coerce.ts'
 import type {
   DiscoveredAccount,
   GeneratedScript,
@@ -55,8 +62,8 @@ export async function generateScriptFromReel(
     id: `script-${Date.now()}`,
     title,
     sourceReelId: reel.id,
-    beats: parsed.beats?.length ? parsed.beats : fallback.beats,
-    captions: parsed.captions || fallback.captions,
+    beats: asBeats(parsed.beats, fallback.beats),
+    captions: asCaptions(parsed.captions, fallback.captions),
     createdAt: new Date().toISOString(),
     transcriptionId: extras?.transcription?.id,
   }
@@ -378,9 +385,9 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown):
       id: `remake-${Date.now()}`,
       sourceReelId: reel.id,
       handle: reel.handle,
-      why: parsed.why || fallback.why,
-      identical: parsed.identical || fallback.identical,
-      inVoice: parsed.inVoice || fallback.inVoice,
+      why: typeof parsed.why === 'string' && parsed.why.trim() ? parsed.why : fallback.why,
+      identical: asRemakeVariant(parsed.identical, fallback.identical),
+      inVoice: asRemakeVariant(parsed.inVoice, fallback.inVoice),
       createdAt: new Date().toISOString(),
     }
   } catch {
@@ -431,14 +438,14 @@ Réponds uniquement en JSON:
 3 à 5 éléments par liste.`
   const content = llmProvider() === 'claude' ? await callClaude(prompt, lang) : await callOpenAI(prompt, lang)
   const parsed = parseProfileJson(content)
-  return {
+  return sanitizeProfileAnalysis({
     ...fallback,
-    voice: parsed.voice || fallback.voice,
-    pillars: parsed.pillars || fallback.pillars,
-    strengths: parsed.strengths || fallback.strengths,
-    opportunities: parsed.opportunities || fallback.opportunities,
-    rules: parsed.rules || fallback.rules,
-  }
+    voice: typeof parsed.voice === 'string' && parsed.voice.trim() ? parsed.voice : fallback.voice,
+    pillars: asStringList(parsed.pillars, fallback.pillars),
+    strengths: asStringList(parsed.strengths, fallback.strengths),
+    opportunities: asStringList(parsed.opportunities, fallback.opportunities),
+    rules: asStringList(parsed.rules, fallback.rules),
+  })
 }
 
 function parseProfileJson(content: string): Partial<ProfileAnalysis> {
