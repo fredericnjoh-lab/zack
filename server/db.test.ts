@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -128,6 +128,40 @@ test('does not overwrite a durable snapshot when startup restore fails', async (
   assert.equal(remoteSnapshot, preciousSnapshot)
   assert.equal(commands.filter(([name]) => name === 'SET').length, setCount)
   assert.equal(db.loadStore().accounts.at(-1)?.handle, 'local.only')
+})
+
+test('loadStore coerces a transcription whose LLM fields were saved as objects', async () => {
+  const current = db.loadStore()
+  writeFileSync(
+    join(dataDir, 'store.json'),
+    JSON.stringify({
+      ...current,
+      transcriptions: [
+        {
+          id: 'tr-broken',
+          reelId: 'seed-1',
+          handle: 'atelierlumiere',
+          ocrText: { text: 'NEW DROP' },
+          spokenGuess: ['VO: drop', 'CTA'],
+          fullTranscript: [
+            { time: '0:00', text: 'Hook' },
+            { time: '0:05', text: 'Preuve' },
+          ],
+          captions: { punchy: { text: 'légende A' }, soft: 'légende B' },
+          source: 'caption',
+          createdAt: '2026-09-18T00:00:00.000Z',
+        },
+      ],
+    }),
+  )
+
+  const repaired = db.loadStore()
+  const row = repaired.transcriptions?.[0]
+  assert.equal(row?.ocrText, 'NEW DROP')
+  assert.equal(row?.fullTranscript, 'Hook\nPreuve')
+  assert.equal(row?.fullTranscript.slice(0, 4), 'Hook')
+  assert.equal(row?.captions.punchy, 'légende A')
+  assert.equal(row?.captions.soft, 'légende B')
 })
 
 test('keeps the atomic local copy when the remote store is unavailable', async () => {

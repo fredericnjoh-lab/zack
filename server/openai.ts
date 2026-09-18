@@ -1,3 +1,4 @@
+import { asCaptionPair, asPlainText, sanitizeTranscription } from './transcript.ts'
 import type {
   DiscoveredAccount,
   GeneratedScript,
@@ -99,17 +100,17 @@ Réponds UNIQUEMENT en JSON:
   try {
     const content = provider === 'claude' ? await callClaude(prompt, lang) : await callOpenAI(prompt, lang)
     const parsed = parseTranscriptionJson(content)
-    return {
+    return sanitizeTranscription({
       id: `tr-${Date.now()}`,
       reelId: reel.id,
       handle: reel.handle,
-      ocrText: parsed.ocrText || ocrFromVision || fallback.ocrText,
-      spokenGuess: parsed.spokenGuess || fallback.spokenGuess,
-      fullTranscript: parsed.fullTranscript || fallback.fullTranscript,
-      captions: parsed.captions || fallback.captions,
+      ocrText: asPlainText(parsed.ocrText, ocrFromVision || fallback.ocrText),
+      spokenGuess: asPlainText(parsed.spokenGuess, fallback.spokenGuess),
+      fullTranscript: asPlainText(parsed.fullTranscript, fallback.fullTranscript),
+      captions: asCaptionPair(parsed.captions, fallback.captions),
       source: ocrFromVision ? 'vision' : 'caption',
       createdAt: new Date().toISOString(),
-    }
+    })
   } catch {
     return {
       ...fallback,
