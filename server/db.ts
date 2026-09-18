@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { sanitizeTranscription } from './transcript.ts'
 import type { Store } from './types.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -198,6 +199,7 @@ function ensure() {
 function normalizeStore(store: Store): Store {
   if (!Array.isArray(store.remakes)) store.remakes = []
   if (!Array.isArray(store.transcriptions)) store.transcriptions = []
+  else store.transcriptions = store.transcriptions.map(sanitizeTranscription)
   if (!Array.isArray(store.discoveries)) store.discoveries = []
   if (
     !store.writingGuide ||
