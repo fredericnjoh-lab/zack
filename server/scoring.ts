@@ -15,6 +15,17 @@ function group(reel: Reel): 'reel' | 'photo' {
 }
 
 /**
+ * Once any Apify scrape is in the store, drop leftover demo seeds.
+ * Users typically delete the seed accounts and add real brands; those seed
+ * posts stay on disk and would otherwise outrank live competitors (842k views).
+ */
+export function liveReels(reels: Reel[]): Reel[] {
+  return reels.some((reel) => reel.source === 'apify')
+    ? reels.filter((reel) => reel.source !== 'seed')
+    : reels
+}
+
+/**
  * Score = signal / médiane du MÊME compte et du MÊME type de média.
  * Reels comparés aux Reels (vues), photos/carrousels aux photos (likes).
  */
