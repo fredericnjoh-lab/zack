@@ -226,7 +226,9 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
     try {
       const result = await zackApi.chat(text, lang)
       setMessages((prev) => [...prev, { from: 'zack', text: result.reply }])
-      if (result.hits) setHits(result.hits)
+      // Ranking replies only include the top 5. Applying that slice here used to
+      // empty the Veille tab of every other outlier until the next full refresh.
+      if (result.hits && !result.actions?.includes('show_top')) setHits(result.hits)
       if (result.script) {
         setScript(result.script)
         setTab('script')

@@ -1,6 +1,6 @@
 import { fetchReelsForHandles, hasApify } from './apify.ts'
 import { loadStore, saveStore } from './db.ts'
-import { scoreReels } from './scoring.ts'
+import { liveReels, scoreReels } from './scoring.ts'
 
 export type JobState = {
   status: 'idle' | 'running' | 'ok' | 'error'
@@ -52,7 +52,7 @@ export function startVeilleJob(opts?: { source?: string }): { started: boolean; 
         current.reels = [...other, ...fetched]
         current.lastVeilleMode = 'apify'
         current.lastVeilleAt = new Date().toISOString()
-        const hits = scoreReels(current.reels)
+        const hits = scoreReels(liveReels(current.reels))
         const top = hits.slice(0, 5)
         const summary =
           top.length === 0
@@ -76,7 +76,7 @@ export function startVeilleJob(opts?: { source?: string }): { started: boolean; 
 
       current.lastVeilleMode = current.reels.some((r) => r.source === 'manual') ? 'manual' : 'seed'
       current.lastVeilleAt = new Date().toISOString()
-      const hits = scoreReels(current.reels)
+      const hits = scoreReels(liveReels(current.reels))
       saveStore(current)
       veilleJob = {
         status: 'ok',

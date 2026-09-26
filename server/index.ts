@@ -27,7 +27,7 @@ import {
 } from './openai.ts'
 import { pickLang, t } from './messages.ts'
 import { maybeRunAutoVeille, startAutoVeilleLoop } from './scheduler.ts'
-import { scorePhotos, scoreReels } from './scoring.ts'
+import { liveReels, scorePhotos, scoreReels } from './scoring.ts'
 import type { Reel } from './types.ts'
 
 // Load .env without extra dependency
@@ -94,14 +94,12 @@ app.delete('/api/accounts/:handle', (req, res) => {
 app.get('/api/veille', (req, res) => {
   const lang = pickLang(req.query.lang)
   const store = loadStore()
-  const liveReels = store.reels.some((r) => r.source === 'apify')
-    ? store.reels.filter((r) => r.source !== 'seed')
-    : store.reels
-  const scored = scoreReels(liveReels, 2.5, lang)
+  const live = liveReels(store.reels)
+  const scored = scoreReels(live, 2.5, lang)
   res.json({
     accounts: store.accounts,
     hits: scored,
-    allCount: liveReels.length,
+    allCount: live.length,
     lastVeilleAt: store.lastVeilleAt,
     lastVeilleMode: store.lastVeilleMode,
     apify: hasApify(),
@@ -131,7 +129,7 @@ app.post('/api/veille/run', (req, res) => {
     job,
     mode: job.mode || 'pending',
     fetched: job.fetched || 0,
-    hits: scoreReels(store.reels),
+    hits: scoreReels(liveReels(store.reels)),
     notice: started
       ? m.veilleStarted
       : job.status === 'running'
@@ -202,7 +200,7 @@ app.post('/api/auto-veille/run', async (req, res) => {
   res.json({
     ...result,
     autoVeille: store.autoVeille,
-    hits: scoreReels(store.reels).slice(0, 10),
+    hits: scoreReels(liveReels(store.reels)).slice(0, 10),
     job: getVeilleJob(),
   })
 })
@@ -279,7 +277,7 @@ app.post('/api/reels/manual', (req, res) => {
   }
   store.reels.push(reel)
   saveStore(store)
-  res.json({ reel, hits: scoreReels(store.reels) })
+  res.json({ reel, hits: scoreReels(liveReels(store.reels)) })
 })
 
 app.get('/api/calendar', (_req, res) => {
@@ -475,10 +473,7 @@ app.delete('/api/writing/documents/:id', (req, res) => {
 app.get('/api/photos', (req, res) => {
   const lang = pickLang(req.query.lang)
   const store = loadStore()
-  const liveReels = store.reels.some((r) => r.source === 'apify')
-    ? store.reels.filter((r) => r.source !== 'seed')
-    : store.reels
-  res.json({ hits: scorePhotos(liveReels, 2.0, lang), remakes: store.remakes.slice(0, 10) })
+  res.json({ hits: scorePhotos(liveReels(store.reels), 2.0, lang), remakes: store.remakes.slice(0, 10) })
 })
 
 app.get('/api/profile', (_req, res) => {
@@ -561,7 +556,7 @@ app.post('/api/chat', async (req, res) => {
   const m = t(lang)
   const text = parsed.data.message.toLowerCase()
   const store = loadStore()
-  const hits = scoreReels(store.reels, 2.5, lang)
+  const hits = scoreReels(liveReels(store.reels), 2.5, lang)
   const actions: string[] = []
 
   try {
