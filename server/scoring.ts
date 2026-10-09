@@ -1,5 +1,15 @@
 import type { Lang } from './fashion.ts'
-import type { MediaType, Reel, ScoredReel } from './types.ts'
+import type { Account, MediaType, Reel, ScoredReel } from './types.ts'
+
+/**
+ * Radar / Photos / ranking only show brands the user still follows.
+ * Unfollow used to leave every historical post in the store, so a removed
+ * demo or competitor account kept dominating the board.
+ */
+export function followedReels(reels: Reel[], accounts: Pick<Account, 'handle'>[]): Reel[] {
+  const followed = new Set(accounts.map((account) => account.handle))
+  return reels.filter((reel) => followed.has(reel.handle))
+}
 
 function median(values: number[]): number {
   if (values.length === 0) return 0
