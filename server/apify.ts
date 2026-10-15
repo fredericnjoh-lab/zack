@@ -1,7 +1,7 @@
 import type { MediaType, Reel } from './types.ts'
 import { normalizeHandle } from './db.ts'
 
-type ApifyItem = {
+export type ApifyItem = {
   id?: string
   shortCode?: string
   url?: string
@@ -17,6 +17,15 @@ type ApifyItem = {
   type?: string
   images?: string[]
   childPosts?: unknown[]
+}
+
+/** First finite number > 0. `??` is wrong here: Instagram often sends `videoViewCount: 0`. */
+export function firstPositiveMetric(...values: unknown[]): number {
+  for (const value of values) {
+    const n = Number(value)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return 0
 }
 
 function classify(item: ApifyItem): MediaType {
@@ -92,40 +101,49 @@ export async function fetchReelsForHandles(handles: string[], limitPerAccount = 
   )
   if (!itemsRes.ok) throw new Error(`Apify dataset failed: ${itemsRes.status}`)
   const items = (await itemsRes.json()) as ApifyItem[]
+  return mapApifyItems(items)
+}
 
+/** Map a scraper row to a stored reel. Drops items with no usable handle or reach. */
+export function mapApifyItem(item: ApifyItem): Reel | undefined {
+  const handle = normalizeHandle(item.ownerUsername || '')
+  if (!handle) return undefined
+
+  const mediaType = classify(item)
+  // Play count is what Instagram shows on Reels. Legacy `videoViewCount` is often
+  // 0 or several times smaller when both fields are present — prefer plays so a
+  // mix of the two metrics cannot invent or hide outliers. Photos have no plays.
+  const views =
+    mediaType === 'reel'
+      ? firstPositiveMetric(item.videoPlayCount, item.videoViewCount, item.likesCount)
+      : firstPositiveMetric(item.likesCount)
+  if (views <= 0) return undefined
+
+  return {
+    id: String(item.id || item.shortCode || `${handle}-${views}`),
+    handle,
+    shortCode: item.shortCode,
+    url:
+      item.url ||
+      (item.shortCode
+        ? `https://www.instagram.com/${mediaType === 'reel' ? 'reel' : 'p'}/${item.shortCode}/`
+        : undefined),
+    caption: (item.caption || '').slice(0, 280),
+    views,
+    likes: item.likesCount,
+    comments: item.commentsCount,
+    takenAt: item.timestamp,
+    source: 'apify',
+    mediaType,
+    imageUrl: item.displayUrl || item.images?.[0],
+  }
+}
+
+export function mapApifyItems(items: ApifyItem[]): Reel[] {
   const reels: Reel[] = []
   for (const item of items) {
-    const handle = normalizeHandle(item.ownerUsername || '')
-    if (!handle) continue
-
-    const mediaType = classify(item)
-    // Reels are scored on views; photos/carousels have none, so likes are the
-    // reach proxy. Keeping the metric per media type keeps scoring honest.
-    const views =
-      mediaType === 'reel'
-        ? Number(item.videoViewCount ?? item.videoPlayCount ?? item.likesCount ?? 0)
-        : Number(item.likesCount ?? 0)
-    if (views <= 0) continue
-
-    reels.push({
-      id: String(item.id || item.shortCode || `${handle}-${views}`),
-      handle,
-      shortCode: item.shortCode,
-      url:
-        item.url ||
-        (item.shortCode
-          ? `https://www.instagram.com/${mediaType === 'reel' ? 'reel' : 'p'}/${item.shortCode}/`
-          : undefined),
-      caption: (item.caption || '').slice(0, 280),
-      views,
-      likes: item.likesCount,
-      comments: item.commentsCount,
-      takenAt: item.timestamp,
-      source: 'apify',
-      mediaType,
-      imageUrl: item.displayUrl || item.images?.[0],
-    })
+    const reel = mapApifyItem(item)
+    if (reel) reels.push(reel)
   }
-
   return reels
 }
