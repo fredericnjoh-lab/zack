@@ -53,6 +53,9 @@ export async function maybeRunAutoVeille(force = false): Promise<AutoVeilleResul
   if (job.status === 'running') {
     return { ran: false, reason: 'veille déjà en cours' }
   }
+  if (!force && job.status === 'error' && alreadyRanToday(job.finishedAt)) {
+    return { ran: false, reason: 'échec déjà tenté aujourd’hui' }
+  }
 
   const { started } = startVeilleJob({ source: force ? 'cron' : 'scheduler' })
   if (!started) {
