@@ -19,6 +19,22 @@ export function getVeilleJob(): JobState {
   return { ...veilleJob }
 }
 
+export function resetVeilleJob(): void {
+  veilleJob = { status: 'idle' }
+}
+
+/**
+ * Mark today as already attempted so the minute-loop scheduler does not
+ * launch another paid Apify run after a failure (or a local-only rescore).
+ * Reloads the store so a long scrape cannot clobber concurrent writes.
+ */
+export function stampAutoVeilleAttempt(at = new Date()): void {
+  const store = loadStore()
+  if (!store.autoVeille) store.autoVeille = { enabled: false, hour: 7 }
+  store.autoVeille.lastRunAt = at.toISOString()
+  saveStore(store)
+}
+
 /** Run Apify scrape in the background so Render HTTP timeouts don't kill the request. */
 export function startVeilleJob(opts?: { source?: string }): { started: boolean; job: JobState } {
   if (veilleJob.status === 'running') {
@@ -76,6 +92,8 @@ export function startVeilleJob(opts?: { source?: string }): { started: boolean; 
 
       current.lastVeilleMode = current.reels.some((r) => r.source === 'manual') ? 'manual' : 'seed'
       current.lastVeilleAt = new Date().toISOString()
+      if (!current.autoVeille) current.autoVeille = { enabled: false, hour: 7 }
+      current.autoVeille.lastRunAt = current.lastVeilleAt
       const hits = scoreReels(current.reels)
       saveStore(current)
       veilleJob = {
@@ -88,6 +106,11 @@ export function startVeilleJob(opts?: { source?: string }): { started: boolean; 
         summary: 'Veille locale recalculée (pas de APIFY_TOKEN).',
       }
     } catch (err) {
+      try {
+        stampAutoVeilleAttempt()
+      } catch {
+        /* still surface the job error if persistence fails */
+      }
       veilleJob = {
         status: 'error',
         startedAt: veilleJob.startedAt,
