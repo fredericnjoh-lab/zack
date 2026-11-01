@@ -167,24 +167,71 @@ Réponds UNIQUEMENT en JSON:
   }
 }
 
+/** Claude/OpenAI often wrap a requested string as `{text}` / `{line}` or an array. */
+export function asPlainText(value: unknown, fallback: string): string {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed || fallback
+  }
+  if (Array.isArray(value)) {
+    const joined = value
+      .map((item) => asPlainText(item, ''))
+      .filter(Boolean)
+      .join(' ')
+    return joined || fallback
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    for (const key of ['text', 'line', 'hook', 'value', 'content', 'subtitle', 'tone']) {
+      const inner = record[key]
+      if (typeof inner === 'string' && inner.trim()) return inner.trim()
+    }
+  }
+  return fallback
+}
+
+/**
+ * Apply a shorten-hook LLM payload (or a local fallback) without persisting
+ * non-strings. `beat.line` is rendered as a React child on the Script tab.
+ */
+export function applyShortenedHook(
+  script: GeneratedScript,
+  parsed: { hook?: unknown; tone?: unknown; subtitle?: unknown } = {},
+): { hook: string; beats: GeneratedScript['beats'] } {
+  const beats = Array.isArray(script.beats) ? script.beats : []
+  const first = beats[0]
+  const fallbackHook = asPlainText(first?.line, asPlainText(script.title, 'Hook'))
+    .split(/[.!?]/)[0]!
+    .slice(0, 90)
+  const hook = asPlainText(parsed.hook, fallbackHook).slice(0, 80)
+  const next = beats.map((beat, i) =>
+    i === 0
+      ? {
+          ...beat,
+          line: hook,
+          tone: asPlainText(parsed.tone, asPlainText(beat.tone, '')),
+          subtitle: asPlainText(parsed.subtitle, hook.slice(0, 42)),
+        }
+      : beat,
+  )
+  return { hook, beats: next }
+}
+
 export async function shortenHook(
   script: GeneratedScript,
   writingContext = '',
   lang: Lang = 'fr',
 ): Promise<{ hook: string; beats: GeneratedScript['beats'] }> {
-  const first = script.beats[0]
+  const first = Array.isArray(script.beats) ? script.beats[0] : undefined
+  const currentLine = asPlainText(first?.line, asPlainText(script.title, ''))
   const provider = llmProvider()
   if (provider === 'local') {
-    const hook = (first?.line || script.title).split(/[.!?]/)[0]!.slice(0, 90)
-    const beats = script.beats.map((b, i) =>
-      i === 0 ? { ...b, line: hook, subtitle: hook.slice(0, 40) } : b,
-    )
-    return { hook, beats }
+    return applyShortenedHook(script)
   }
 
   const prompt = `Raccourcis l'accroche de ce script Reel. Garde le punch, max 12 mots.
 Titre: ${script.title}
-Accroche actuelle: ${first?.line || ''}
+Accroche actuelle: ${currentLine}
 ${writingContext ? `Contexte écriture:\n${writingContext.slice(0, 800)}` : ''}
 
 Réponds UNIQUEMENT en JSON:
@@ -192,24 +239,13 @@ Réponds UNIQUEMENT en JSON:
 
   const content = provider === 'claude' ? await callClaude(prompt, lang) : await callOpenAI(prompt, lang)
   const cleaned = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim()
-  let parsed: { hook?: string; tone?: string; subtitle?: string } = {}
+  let parsed: { hook?: unknown; tone?: unknown; subtitle?: unknown } = {}
   try {
     parsed = JSON.parse(cleaned.match(/\{[\s\S]*\}/)?.[0] || cleaned) as typeof parsed
   } catch {
     parsed = {}
   }
-  const hook = parsed.hook || (first?.line || script.title).slice(0, 80)
-  const beats = script.beats.map((b, i) =>
-    i === 0
-      ? {
-          ...b,
-          line: hook,
-          tone: parsed.tone || b.tone,
-          subtitle: parsed.subtitle || hook.slice(0, 42),
-        }
-      : b,
-  )
-  return { hook, beats }
+  return applyShortenedHook(script, parsed)
 }
 
 async function ocrFrameWithClaude(imageUrl: string): Promise<string> {
