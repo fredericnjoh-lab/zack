@@ -1,6 +1,30 @@
 import { fetchReelsForHandles, hasApify } from './apify.ts'
 import { loadStore, saveStore } from './db.ts'
 import { scoreReels } from './scoring.ts'
+import type { Account, Reel } from './types.ts'
+
+/**
+ * Fold a fresh Apify snapshot into the store without deleting user data.
+ * Replacing every followed handle's posts used to drop:
+ * - manual Reels the user typed in (always, even when Apify returned data)
+ * - the previous snapshot for a handle that came back empty this run
+ *   (private, rate-limited, or every item filtered for views <= 0)
+ */
+export function mergeScrapedReels(
+  existing: Reel[],
+  fetched: Reel[],
+  accounts: Pick<Account, 'handle'>[],
+): Reel[] {
+  const followed = new Set(accounts.map((account) => account.handle))
+  const fetchedHandles = new Set(fetched.map((reel) => reel.handle))
+  const kept = existing.filter((reel) => {
+    if (reel.source === 'manual') return true
+    if (!followed.has(reel.handle)) return true
+    if (!fetchedHandles.has(reel.handle)) return true
+    return false
+  })
+  return [...kept, ...fetched]
+}
 
 export type JobState = {
   status: 'idle' | 'running' | 'ok' | 'error'
@@ -46,10 +70,7 @@ export function startVeilleJob(opts?: { source?: string }): { started: boolean; 
       const current = loadStore()
       if (hasApify()) {
         const fetched = await fetchReelsForHandles(current.accounts.map((a) => a.handle))
-        const other = current.reels.filter(
-          (r) => !current.accounts.some((a) => a.handle === r.handle),
-        )
-        current.reels = [...other, ...fetched]
+        current.reels = mergeScrapedReels(current.reels, fetched, current.accounts)
         current.lastVeilleMode = 'apify'
         current.lastVeilleAt = new Date().toISOString()
         const hits = scoreReels(current.reels)
