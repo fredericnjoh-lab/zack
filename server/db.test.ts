@@ -130,6 +130,42 @@ test('does not overwrite a durable snapshot when startup restore fails', async (
   assert.equal(db.loadStore().accounts.at(-1)?.handle, 'local.only')
 })
 
+test('updateStore writes on top of the latest snapshot, not a stale copy', async () => {
+  const withCalendar = db.loadStore()
+  withCalendar.calendar.push({
+    id: 'cal-keep',
+    day: 3,
+    month: 8,
+    year: 2026,
+    label: 'idée concurrente',
+    status: 'ecrit',
+  })
+  db.saveStore(withCalendar)
+
+  const stale = db.loadStore()
+  const latest = db.loadStore()
+  latest.scripts.push({
+    id: 'script-keep',
+    title: 'script ajouté pendant la veille',
+    beats: [],
+    captions: { punchy: 'a', soft: 'b' },
+    createdAt: '2026-08-22T00:00:00.000Z',
+  })
+  db.saveStore(latest)
+
+  // The previous jobs path would save `stale` and drop the script.
+  stale.lastVeilleMode = 'apify'
+  const saved = db.updateStore((current) => {
+    current.lastVeilleMode = 'apify'
+    current.lastVeilleAt = '2026-08-22T12:00:00.000Z'
+  })
+
+  assert.equal(saved.calendar.some((item) => item.id === 'cal-keep'), true)
+  assert.equal(saved.scripts.some((item) => item.id === 'script-keep'), true)
+  assert.equal(saved.lastVeilleMode, 'apify')
+  assert.equal(db.loadStore().scripts.at(-1)?.id, 'script-keep')
+})
+
 test('keeps the atomic local copy when the remote store is unavailable', async () => {
   const recovered = await db.initializeStore()
   assert.equal(recovered.durableWrites, true)
