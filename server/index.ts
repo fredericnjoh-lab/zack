@@ -217,20 +217,11 @@ app.post('/api/discover', async (req, res) => {
       writingContext(store),
       lang,
     )
-    // Optional light verification: scrape first suggestion if Apify is on.
-    if (hasApify() && suggestions[0]) {
-      try {
-        const sample = await fetchReelsForHandles([suggestions[0].handle], 3)
-        if (sample.length) {
-          suggestions[0].verified = true
-          suggestions[0].sampleViews = Math.max(...sample.map((s) => s.views))
-        }
-      } catch {
-        /* keep unverified */
-      }
-    }
-    store.discoveries = suggestions
-    saveStore(store)
+    // Skip Apify verification here: a full scrape exceeds Render's HTTP timeout
+    // and a client retry would start a second paid actor run.
+    const latest = loadStore()
+    latest.discoveries = suggestions
+    saveStore(latest)
     res.json({ discoveries: suggestions, llm: llmProvider() })
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'découverte échouée' })
