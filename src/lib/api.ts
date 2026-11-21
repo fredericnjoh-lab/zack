@@ -92,7 +92,6 @@ export const zackApi = {
     api<{ discoveries: DiscoveredAccount[]; llm: string }>('/api/discover', {
       method: 'POST',
       body: JSON.stringify({ lang }),
-      retries: 1,
     }),
   addAccount: (handle: string) =>
     api<{ accounts: { handle: string }[] }>('/api/accounts', {
