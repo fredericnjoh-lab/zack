@@ -14,9 +14,8 @@ import {
   saveStore,
   writingContext,
 } from './db.ts'
-import { getVeilleJob, startVeilleJob } from './jobs.ts'
+import { getProfileJob, getVeilleJob, startProfileJob, startVeilleJob } from './jobs.ts'
 import {
-  analyzeProfile,
   discoverAccounts,
   generatePhotoRemake,
   generateScriptFromReel,
@@ -486,30 +485,24 @@ app.get('/api/profile', (_req, res) => {
   res.json({
     profile: store.profile || null,
     writingGuide: store.writingGuide || { documents: [], learnedRules: [] },
+    job: getProfileJob(),
   })
 })
 
-app.post('/api/profile/analyze', async (req, res) => {
+app.post('/api/profile/analyze', (req, res) => {
   const parsed = z.object({ handle: z.string().min(1) }).safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: 'handle requis' })
   const handle = normalizeHandle(parsed.data.handle)
-  try {
-    const posts = hasApify()
-      ? await fetchReelsForHandles([handle], 24)
-      : loadStore().reels.filter((r) => r.handle === handle)
-    if (!posts.length) {
-      return res.status(404).json({
-        error: t(pickLang((req.body as { lang?: string })?.lang)).privateAccount({ handle }),
-      })
-    }
-    const profile = await analyzeProfile(handle, posts)
-    const store = loadStore()
-    store.profile = profile
-    saveStore(store)
-    res.json({ profile, llm: llmProvider() })
-  } catch (err) {
-    res.status(502).json({ error: err instanceof Error ? err.message : 'analyse profil échouée' })
-  }
+  if (!handle) return res.status(400).json({ error: 'handle requis' })
+  const lang = pickLang((req.body as { lang?: string })?.lang)
+  const { started, job } = startProfileJob({ handle, lang })
+  res.json({
+    async: true,
+    started,
+    job,
+    profile: loadStore().profile || null,
+    llm: llmProvider(),
+  })
 })
 
 app.get('/api/image', async (req, res) => {

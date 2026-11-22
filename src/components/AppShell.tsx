@@ -10,6 +10,7 @@ import type {
   GeneratedScript,
   PhotoRemake,
   ProfileAnalysis,
+  ProfileJob,
   ScoredReel,
   Transcription,
   VeilleJob,
@@ -107,6 +108,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
   const [busy, setBusy] = useState(false)
   const [waking, setWaking] = useState(false)
   const [job, setJob] = useState<VeilleJob>({ status: 'idle' })
+  const [profileJob, setProfileJob] = useState<ProfileJob>({ status: 'idle' })
   const [error, setError] = useState('')
   const [handleInput, setHandleInput] = useState('')
   const [manual, setManual] = useState({ handle: '', views: '', caption: '', baseline: '' })
@@ -152,6 +154,7 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
       setProfile(own.profile)
       if (own.writingGuide) setWritingGuide(own.writingGuide)
       if (own.profile) setProfileHandle(own.profile.handle)
+      if (own.job) setProfileJob(own.job)
       setRemakes((prev) => {
         const next = { ...prev }
         for (const rm of p.remakes) if (!next[rm.sourceReelId]) next[rm.sourceReelId] = rm
@@ -217,6 +220,34 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
     }, 2500)
     return () => clearInterval(id)
   }, [job.status, c.veilleDone, c.veilleFailed])
+
+  useEffect(() => {
+    if (profileJob.status !== 'running') return
+    const tick = async () => {
+      try {
+        const own = await zackApi.profile()
+        if (own.job) setProfileJob(own.job)
+        if (own.profile) {
+          setProfile(own.profile)
+          setProfileHandle(own.profile.handle)
+        }
+        if (own.writingGuide) setWritingGuide(own.writingGuide)
+        if (own.job?.status === 'error') {
+          setError(own.job.error || c.errProfile)
+          setBusy(false)
+        } else if (own.job?.status !== 'running') {
+          setBusy(false)
+        }
+      } catch {
+        /* ignore transient */
+      }
+    }
+    void tick()
+    const id = setInterval(() => {
+      void tick()
+    }, 2500)
+    return () => clearInterval(id)
+  }, [profileJob.status, c.errProfile])
 
   async function send() {
     const text = draft.trim()
@@ -291,6 +322,13 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
         </div>
       )}
 
+      {profileJob.status === 'running' && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <strong>{c.analyzing}</strong>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>{c.dnaBody}</p>
+        </div>
+      )}
+
       <nav className="tabs tabs-6" aria-label="Zack">
         {(
           [
@@ -326,13 +364,17 @@ export function AppShell({ onBack, lang, onLang }: AppShellProps) {
             setBusy(true)
             setError('')
             try {
-              const result = await zackApi.analyzeProfile(profileHandle)
-              setProfile(result.profile)
+              const result = await zackApi.analyzeProfile(profileHandle, lang)
+              if (result.job) setProfileJob(result.job)
+              if (result.profile && result.job?.status !== 'running') setProfile(result.profile)
+              if (result.job?.status === 'running') return
+              if (result.job?.status === 'error') {
+                setError(result.job.error || c.errProfile)
+              }
             } catch (e) {
               setError(e instanceof Error ? e.message : c.errProfile)
-            } finally {
-              setBusy(false)
             }
+            setBusy(false)
           }}
           onAddDocument={async (name, content) => {
             setBusy(true)

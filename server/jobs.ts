@@ -1,6 +1,8 @@
 import { fetchReelsForHandles, hasApify } from './apify.ts'
 import { loadStore, saveStore } from './db.ts'
+import { analyzeProfile } from './openai.ts'
 import { scoreReels } from './scoring.ts'
+import type { Lang } from './fashion.ts'
 
 export type JobState = {
   status: 'idle' | 'running' | 'ok' | 'error'
@@ -98,4 +100,85 @@ export function startVeilleJob(opts?: { source?: string }): { started: boolean; 
   })()
 
   return { started: true, job: getVeilleJob() }
+}
+
+export type ProfileJobState = {
+  status: 'idle' | 'running' | 'ok' | 'error'
+  handle?: string
+  startedAt?: string
+  finishedAt?: string
+  error?: string
+  posts?: number
+}
+
+let profileJob: ProfileJobState = { status: 'idle' }
+
+export function getProfileJob(): ProfileJobState {
+  return { ...profileJob }
+}
+
+/**
+ * Learn a brand's voice without blocking the HTTP request.
+ * A live Apify scrape of 24 posts plus the LLM call exceeds Render's
+ * load-balancer timeout, so this runs in the background like Veille.
+ */
+export function startProfileJob(opts: {
+  handle: string
+  lang?: Lang
+}): { started: boolean; job: ProfileJobState } {
+  if (profileJob.status === 'running') {
+    return { started: false, job: getProfileJob() }
+  }
+
+  const handle = opts.handle
+  const lang = opts.lang || 'fr'
+  profileJob = {
+    status: 'running',
+    handle,
+    startedAt: new Date().toISOString(),
+  }
+
+  void (async () => {
+    try {
+      const posts = hasApify()
+        ? await fetchReelsForHandles([handle], 24)
+        : loadStore().reels.filter((reel) => reel.handle === handle)
+      if (!posts.length) {
+        profileJob = {
+          status: 'error',
+          handle,
+          startedAt: profileJob.startedAt,
+          finishedAt: new Date().toISOString(),
+          error:
+            lang === 'en'
+              ? `No posts retrieved for @${handle}. Check the spelling, that the account is public, and run a scan if you follow it.`
+              : `Aucune publication récupérée pour @${handle}. Vérifie l’orthographe, que le compte est public, et lance une veille si tu le suis.`,
+        }
+        return
+      }
+      const profile = await analyzeProfile(handle, posts, lang)
+      // Reload after the awaits so a concurrent calendar/script/veille write
+      // is not overwritten by a snapshot taken before the scrape.
+      const latest = loadStore()
+      latest.profile = profile
+      saveStore(latest)
+      profileJob = {
+        status: 'ok',
+        handle,
+        startedAt: profileJob.startedAt,
+        finishedAt: new Date().toISOString(),
+        posts: posts.length,
+      }
+    } catch (err) {
+      profileJob = {
+        status: 'error',
+        handle,
+        startedAt: profileJob.startedAt,
+        finishedAt: new Date().toISOString(),
+        error: err instanceof Error ? err.message : 'analyse profil échouée',
+      }
+    }
+  })()
+
+  return { started: true, job: getProfileJob() }
 }

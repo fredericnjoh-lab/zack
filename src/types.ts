@@ -103,6 +103,15 @@ export type VeilleJob = {
   summary?: string
 }
 
+export type ProfileJob = {
+  status: 'idle' | 'running' | 'ok' | 'error'
+  handle?: string
+  startedAt?: string
+  finishedAt?: string
+  error?: string
+  posts?: number
+}
+
 export type AutoVeilleSettings = {
   enabled: boolean
   hour: number
