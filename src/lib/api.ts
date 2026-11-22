@@ -5,6 +5,7 @@ import type {
   GeneratedScript,
   PhotoRemake,
   ProfileAnalysis,
+  ProfileJob,
   ScoredReel,
   StatusPayload,
   Transcription,
@@ -164,13 +165,22 @@ export const zackApi = {
       body: JSON.stringify({ reelId, lang }),
     }),
   profile: () =>
-    api<{ profile: ProfileAnalysis | null; writingGuide?: WritingGuide }>('/api/profile', {
-      retries: 3,
-    }),
-  analyzeProfile: (handle: string) =>
-    api<{ profile: ProfileAnalysis; llm: string }>('/api/profile/analyze', {
+    api<{ profile: ProfileAnalysis | null; writingGuide?: WritingGuide; job?: ProfileJob }>(
+      '/api/profile',
+      {
+        retries: 3,
+      },
+    ),
+  analyzeProfile: (handle: string, lang: Lang = 'fr') =>
+    api<{
+      profile: ProfileAnalysis | null
+      llm: string
+      async?: boolean
+      started?: boolean
+      job?: ProfileJob
+    }>('/api/profile/analyze', {
       method: 'POST',
-      body: JSON.stringify({ handle }),
+      body: JSON.stringify({ handle, lang }),
     }),
   writing: () => api<{ writingGuide: WritingGuide }>('/api/writing', { retries: 2 }),
   addDocument: (name: string, content: string) =>
