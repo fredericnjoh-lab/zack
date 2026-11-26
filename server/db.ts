@@ -289,9 +289,29 @@ async function redisCommand(command: string[]): Promise<unknown> {
   return payload.result
 }
 
+const REMOTE_ATTEMPTS = 3
+
+/** GET already retried; SET used to drop the snapshot after one 503. */
+async function withRemoteRetries<T>(op: () => Promise<T>): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= REMOTE_ATTEMPTS; attempt++) {
+    try {
+      return await op()
+    } catch (error) {
+      lastError = error
+      if (attempt === REMOTE_ATTEMPTS) break
+      const delay = process.env.NODE_ENV === 'test' ? 10 : attempt * 500
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('persistance distante indisponible')
+}
+
 async function writeRemoteStore(serialized: string): Promise<void> {
-  const result = await redisCommand(['SET', remoteKey(), serialized])
-  if (result !== 'OK') throw new Error('Upstash n’a pas confirmé la sauvegarde')
+  await withRemoteRetries(async () => {
+    const result = await redisCommand(['SET', remoteKey(), serialized])
+    if (result !== 'OK') throw new Error('Upstash n’a pas confirmé la sauvegarde')
+  })
   persistenceStatus.lastSyncedAt = new Date().toISOString()
   persistenceStatus.lastError = undefined
 }
@@ -355,17 +375,7 @@ export async function initializeStore(): Promise<PersistenceStatus> {
   }
 
   try {
-    let result: unknown
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        result = await redisCommand(['GET', remoteKey()])
-        break
-      } catch (error) {
-        if (attempt === 3) throw error
-        const delay = process.env.NODE_ENV === 'test' ? 10 : attempt * 500
-        await new Promise((resolve) => setTimeout(resolve, delay))
-      }
-    }
+    const result = await withRemoteRetries(() => redisCommand(['GET', remoteKey()]))
     if (typeof result === 'string') {
       const parsed: unknown = JSON.parse(result)
       if (!isStore(parsed)) throw new Error('snapshot Upstash invalide')

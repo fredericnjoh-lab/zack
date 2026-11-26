@@ -9,6 +9,7 @@ import type { Store } from './types.ts'
 const dataDir = mkdtempSync(join(tmpdir(), 'zack-store-'))
 let remoteSnapshot: string | null = null
 let failedGets = 0
+let failedSets = 0
 const commands: string[][] = []
 
 const redis = createServer((req, res) => {
@@ -32,6 +33,12 @@ const redis = createServer((req, res) => {
       return
     }
     if (command[0] === 'SET') {
+      if (failedSets > 0) {
+        failedSets -= 1
+        res.statusCode = 503
+        res.end(JSON.stringify({ error: 'temporary outage' }))
+        return
+      }
       remoteSnapshot = command[2]!
       res.end(JSON.stringify({ result: 'OK' }))
       return
@@ -128,6 +135,47 @@ test('does not overwrite a durable snapshot when startup restore fails', async (
   assert.equal(remoteSnapshot, preciousSnapshot)
   assert.equal(commands.filter(([name]) => name === 'SET').length, setCount)
   assert.equal(db.loadStore().accounts.at(-1)?.handle, 'local.only')
+})
+
+test('retries a failed Upstash SET so a 503 cannot drop the last snapshot', async () => {
+  failedGets = 0
+  const status = await db.initializeStore()
+  assert.equal(status.durableWrites, true)
+
+  const before = remoteSnapshot
+  failedSets = 2
+  const store = db.loadStore()
+  store.accounts.push({ handle: 'retried.brand', addedAt: '2026-11-26T11:00:00.000Z' })
+  db.saveStore(store)
+  await db.flushStoreWrites()
+
+  assert.equal(failedSets, 0)
+  assert.notEqual(remoteSnapshot, before)
+  const savedRemote = JSON.parse(remoteSnapshot!) as Store
+  assert.equal(savedRemote.accounts.at(-1)?.handle, 'retried.brand')
+  assert.equal(db.getPersistenceStatus().lastError, undefined)
+  assert.ok(db.getPersistenceStatus().lastSyncedAt)
+})
+
+test('keeps the local snapshot when every SET attempt fails', async () => {
+  const preciousSnapshot = remoteSnapshot
+  failedSets = 5
+  const store = db.loadStore()
+  store.calendar.push({
+    id: 'cal-local-only',
+    day: 26,
+    month: 11,
+    year: 2026,
+    label: 'idée gardée localement',
+    status: 'ecrit',
+  })
+  db.saveStore(store)
+  await db.flushStoreWrites()
+
+  assert.equal(remoteSnapshot, preciousSnapshot)
+  assert.equal(db.loadStore().calendar.at(-1)?.id, 'cal-local-only')
+  assert.match(db.getPersistenceStatus().lastError || '', /indisponible/i)
+  failedSets = 0
 })
 
 test('keeps the atomic local copy when the remote store is unavailable', async () => {
